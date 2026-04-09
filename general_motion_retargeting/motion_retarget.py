@@ -15,6 +15,7 @@ class GeneralMotionRetargeting:
         src_human: str,
         tgt_robot: str,
         actual_human_height: float = None,
+        ik_config_file: str = None,
         solver: str="daqp", # change from "quadprog" to "daqp".
         damping: float=5e-1, # change from 1e-1 to 1e-2.
         verbose: bool=True,
@@ -53,11 +54,13 @@ class GeneralMotionRetargeting:
             if verbose:
                 print(f"Motor ID {i}: {motor_name}")
 
-        # Load the IK config
-        with open(IK_CONFIG_DICT[src_human][tgt_robot]) as f:
+        # Load IK config (custom file has higher priority)
+        if ik_config_file is None:
+            ik_config_file = IK_CONFIG_DICT[src_human][tgt_robot]
+        with open(ik_config_file) as f:
             ik_config = json.load(f)
         if verbose:
-            print("Use IK config: ", IK_CONFIG_DICT[src_human][tgt_robot])
+            print("Use IK config: ", ik_config_file)
         
         # compute the scale ratio based on given human height and the assumption in the IK config
         if actual_human_height is not None:
@@ -97,7 +100,12 @@ class GeneralMotionRetargeting:
 
         self.ik_limits = [mink.ConfigurationLimit(self.model)]
         if use_velocity_limit:
-            VELOCITY_LIMITS = {k: 3*np.pi for k in self.robot_motor_names.keys()}
+            # mink.VelocityLimit expects joint names, not actuator(motor) names.
+            VELOCITY_LIMITS = {
+                joint_name: 3 * np.pi
+                for joint_name in self.robot_dof_names.keys()
+                if joint_name is not None
+            }
             self.ik_limits.append(mink.VelocityLimit(self.model, VELOCITY_LIMITS)) 
             
         self.setup_retarget_configuration()

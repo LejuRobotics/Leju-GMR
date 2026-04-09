@@ -18,6 +18,11 @@ import general_motion_retargeting.utils.lafan_vendor.utils as utils
 from general_motion_retargeting.utils.lafan_vendor.extract import read_bvh, qmai_read_bvh
 
 import argparse
+import time
+from tqdm import tqdm
+from general_motion_retargeting import GeneralMotionRetargeting as GMR
+from general_motion_retargeting import RobotMotionViewer
+from general_motion_retargeting.utils.lafan1 import load_bvh_file, load_leju_bvh_file
 from general_motion_retargeting.params import IK_CONFIG_DICT
 
 HERE = pathlib.Path(__file__).parent
@@ -342,211 +347,247 @@ class BipedS17GMR(GeneralMotionRetargeting):
 
         return human_data_global
 
+ROBOT_DEFAULT_HUMAN_HEIGHT = {
+    "kuavo_s54": 1.57,
+    "kuavo_s52": 1.57,
+    "roban_s14": 1.80,
+}
+
+
+def _scale_human_frames(frames, scale_factor):
+    if abs(scale_factor - 1.0) < 1e-8:
+        return
+    for frame in frames:
+        for body_name, (pos, rot) in frame.items():
+            frame[body_name] = (np.asarray(pos) * scale_factor, rot)
+
 
 if __name__ == "__main__":
-    import time
-    import select
-    from tqdm import tqdm
-    from general_motion_retargeting import RobotMotionViewer
-
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--bvh_file",
-        help="BVH motion file to load.",
-        required=True,
-        type=str,
-    )
-
-    parser.add_argument(
-        "--format",
-        choices=["lafan1", "qmai", "leju"],
-        default="qmai",
-    )
-
-    parser.add_argument(
-        "--loop",
-        default=False,
-        action="store_true",
-        help="Loop the motion.",
-    )
-
+    parser.add_argument("--bvh_file", help="BVH motion file to load.", required=True, type=str)
+    parser.add_argument("--format", choices=["leju", "lafan1", "nokov", "qmai"], default="leju")
+    parser.add_argument("--loop", default=False, action="store_true", help="Loop the motion.")
     parser.add_argument(
         "--robot",
-        choices=["biped_s17"],
-        default="biped_s17",
+        choices=["roban_s14", "kuavo_s52", "kuavo_s54", "biped_s17"],
+        default="roban_s14",
     )
-
+    parser.add_argument("--record_video", action="store_true", default=False)
+    parser.add_argument("--video_path", type=str, default="output/videos/example.mp4")
+    parser.add_argument("--rate_limit", action="store_true", default=True)
+    parser.add_argument("--save_path", type=str, default=None, help="Path to save the robot motion.")
+    parser.add_argument("--motion_fps", default=30, type=int)
     parser.add_argument(
-        "--record_video",
+        "--actual_human_height",
+        type=float,
+        default=None,
+        help="Override detected human height (meters) for retarget scaling.",
+    )
+    parser.add_argument(
+        "--ik_config_file",
+        type=str,
+        default=None,
+        help="Custom IK config path. Highest priority if provided.",
+    )
+    parser.add_argument(
+        "--leju_scale_mode",
+        choices=["auto", "none"],
+        default="auto",
+        help="Auto-fix Leju BVH unit scale when detected height is abnormal.",
+    )
+    parser.add_argument(
+        "--use_scene_xml",
         action="store_true",
         default=False,
+        help="Use scene.xml for viewer background (ground/skybox), if available.",
     )
-
-    parser.add_argument(
-        "--video_path",
-        type=str,
-        default="output/videos/example.mp4",
-    )
-
-    parser.add_argument(
-        "--rate_limit",
-        action="store_true",
-        default=True,
-    )
-
-    parser.add_argument(
-        "--save_path",
-        type=str,
-        default="output/csv",
-        help="Path to save the robot motion.",
-    )
-    
-    parser.add_argument(
-        "--motion_fps",
-        default=30,
-        type=int,
-    )
-
     args = parser.parse_args()
 
-    # 配置BVH文件名（只需要修改这里）
-    bvh_file_path = args.bvh_file  # 只需要文件名
-    
-    # 自动生成相关路径
-    bvh_filename = os.path.basename(bvh_file_path)
-    base_name = os.path.splitext(bvh_filename)[0]  # 去掉.bvh扩展名
-    json_file_path = IK_CONFIG_DICT[f"bvh_{args.format}"][args.robot]
-    video_output_path = args.video_path
-    csv_output_path = os.path.join(args.save_path, f"{base_name}.csv")
-    
-    print(f"[配置] BVH文件: {bvh_file_path}")
-    print(f"[配置] JSON配置: {json_file_path}")
-    print(f"[配置] 视频输出: {video_output_path}")
-    print(f"[配置] CSV输出: {csv_output_path}")
-    
-    # Load BVH file
-    if args.format == "qmai":
-        mocap_data, actual_human_height = load_qmai_bvh_for_biped_s17(
-            bvh_file=bvh_file_path
+    if args.robot == "biped_s17":
+        if args.format not in ["lafan1", "qmai", "leju"]:
+            raise ValueError("biped_s17 only supports formats: lafan1, qmai, leju")
+
+        bvh_filename = os.path.basename(args.bvh_file)
+        base_name = os.path.splitext(bvh_filename)[0]
+        json_file_path = IK_CONFIG_DICT[f"bvh_{args.format}"][args.robot]
+        save_dir = args.save_path or "output/csv"
+        os.makedirs(save_dir, exist_ok=True)
+        csv_output_path = os.path.join(save_dir, f"{base_name}.csv")
+
+        if args.format == "qmai":
+            mocap_data, actual_human_height = load_qmai_bvh_for_biped_s17(args.bvh_file)
+        elif args.format == "lafan1":
+            mocap_data, actual_human_height = load_lafan1_file_for_biped_s17(args.bvh_file)
+        else:
+            mocap_data, actual_human_height = load_leju_bvh_file_s17(args.bvh_file)
+
+        if args.actual_human_height is not None:
+            actual_human_height = args.actual_human_height
+
+        preprocessor = BipedS17GMR(
+            actual_human_height=actual_human_height,
+            solver="daqp",
+            damping=5e-1,
+            verbose=True,
+            use_velocity_limit=True,
+            ik_config_file=json_file_path,
         )
-    elif args.format == "lafan1":
-        mocap_data, actual_human_height = load_lafan1_file_for_biped_s17(
-            bvh_file=bvh_file_path
+
+        robot_motion_viewer = RobotMotionViewer(
+            robot_type=args.robot,
+            motion_fps=args.motion_fps,
+            transparent_robot=0,
+            use_scene_xml=args.use_scene_xml,
+            record_video=args.record_video,
+            video_path=args.video_path,
         )
-    elif args.format == "leju":
-        mocap_data, actual_human_height = load_leju_bvh_file_s17(
-            bvh_file=bvh_file_path
-        )
 
-    qpos_list = []
+        qpos_list = []
+        pbar = tqdm(total=len(mocap_data), desc="Retargeting")
+        i = 0
+        while True:
+            pbar.update(1)
+            qpos = preprocessor.retarget(mocap_data[i], offset_to_ground=False)
+            qpos_list.append(qpos)
+            robot_motion_viewer.step(
+                root_pos=qpos[:3],
+                root_rot=qpos[3:7],
+                dof_pos=qpos[7:],
+                human_motion_data=preprocessor.scaled_human_data,
+                rate_limit=args.rate_limit,
+                follow_camera=True,
+            )
 
-    preprocessor = BipedS17GMR(
-        actual_human_height=1.57,
-        solver="daqp",
-        damping=5e-1,
-        verbose=True,
-        use_velocity_limit=True,
-        ik_config_file=json_file_path,  # 使用对应的json配置文件
-    )
-
-    robot_motion_viewer = RobotMotionViewer(
-        robot_type=args.robot,
-        motion_fps=args.motion_fps,
-        transparent_robot=0,
-        record_video=args.record_video,
-        video_path=video_output_path,
-    )
-
-    # FPS measurement variables
-    fps_counter = 0
-    fps_start_time = time.time()
-    fps_display_interval = 2.0  # Display FPS every 2 seconds
-    pbar = tqdm(total=len(mocap_data), desc="Retargeting")
-    i = 0
-    
-    # 暂停控制变量
-    is_paused = False
-    print("\n" + "="*60)
-    print("[提示] 播放过程中按 Enter 键可以暂停/恢复播放")
-    print("[提示] 暂停时会显示当前帧数")
-    print("[提示] 使用 Ctrl+C 可以退出程序")
-    print("="*60 + "\n")
-
-    def check_for_enter_key():
-        """检查是否按下Enter键(非阻塞)"""
-        if select.select([sys.stdin], [], [], 0)[0]:
-            input()  # 读取并清空输入缓冲区
-            return True
-        return False
-
-    while True:
-        # 检查是否按下Enter键
-        if check_for_enter_key():
-            is_paused = not is_paused
-            if is_paused:
-                print(f"\n{'='*60}")
-                print(f"[暂停] 当前帧: {i}/{len(mocap_data)-1} (总帧数: {len(mocap_data)})")
-                print(f"[暂停] 已处理帧数: {len(qpos_list)}")
-                print(f"[暂停] 按 Enter 键继续播放...")
-                print(f"{'='*60}\n")
+            if args.loop:
+                i = (i + 1) % len(mocap_data)
             else:
-                print(f"\n[继续] 恢复播放...\n")
-        
-        # 如果暂停,继续检查输入但不处理帧
-        if is_paused:
-            time.sleep(0.01)  # 避免CPU占用过高
-            continue
-        
-        # FPS measurement
-        fps_counter += 1
-        current_time = time.time()
-        if current_time - fps_start_time >= fps_display_interval:
-            actual_fps = fps_counter / (current_time - fps_start_time)
-            print(f"Actual rendering FPS: {actual_fps:.2f}")
-            fps_counter = 0
-            fps_start_time = current_time
-            
-        # Update progress bar
-        pbar.update(1)
-        # Update task targets.
-        qpos = preprocessor.retarget(mocap_data[i], offset_to_ground=False)
-        scaled_human_data = preprocessor.scaled_human_data
-        # visualize scaled results (before IK optimisation) and retargeted results-qpos (after IK optimisation)
-        robot_motion_viewer.step(
-            root_pos=qpos[:3] + np.array([0.0, 0.0, 0.0]),
-            root_rot=qpos[3:7],
-            dof_pos=qpos[7:],
-            human_motion_data=scaled_human_data,
-            rate_limit=False,  # No rate limiting
-            follow_camera=True,
-        )
-        i = (i + 1) % len(mocap_data)
-        qpos_list.append(qpos)
-        
-        # Pause at frame 10 for inspection
-        if i == 1: 
-            input("Press Enter to continue to next frame... (or Ctrl+C to quit)")
+                i += 1
+                if i >= len(mocap_data):
+                    break
 
-        if i == 0:
-            # dump to pickle - 保持XML原始qpos（base_link=waist）
+        motion_data = {
+            "fps": args.motion_fps,
+            "root_pos": np.array([q[:3] for q in qpos_list]),
+            "root_rot": np.array([q[3:7][[1, 2, 3, 0]] for q in qpos_list]),
+            "dof_pos": np.array([q[7:] for q in qpos_list]),
+            "local_body_pos": None,
+            "link_body_list": None,
+        }
+        os.makedirs("output", exist_ok=True)
+        with open("output/qpos_list.pkl", "wb") as f:
+            pickle.dump(motion_data, f)
+        print("Saved to output/qpos_list.pkl")
+        save_qpos_s17_dance_no_head_joint(qpos_list, csv_output_path)
+        pbar.close()
+        robot_motion_viewer.close()
+    else:
+        if args.format == "qmai":
+            raise ValueError("qmai format is currently only supported for biped_s17 in this script.")
+
+        src_human = f"bvh_{args.format}"
+        ik_config_file = None
+        if args.ik_config_file is not None:
+            ik_config_file = pathlib.Path(args.ik_config_file)
+
+        if ik_config_file is not None:
+            ik_config_file = ik_config_file.resolve()
+            if not ik_config_file.exists():
+                raise FileNotFoundError(f"IK config file not found: {ik_config_file}")
+            print(f"[Info] Using IK config file: {ik_config_file}")
+        else:
+            supported_robots = IK_CONFIG_DICT.get(src_human, {})
+            if args.robot not in supported_robots:
+                raise ValueError(
+                    f"Robot '{args.robot}' is not configured for source '{src_human}'. "
+                    f"Supported robots: {sorted(supported_robots.keys())}"
+                )
+            print(f"[Info] Using default IK mapping for {src_human}/{args.robot}")
+
+        if args.format == "leju":
+            lafan1_data_frames, actual_human_height = load_leju_bvh_file(args.bvh_file)
+            if args.leju_scale_mode == "auto":
+                if actual_human_height < 0.6:
+                    _scale_human_frames(lafan1_data_frames, 10.0)
+                    actual_human_height *= 10.0
+                    print(f"[Info] Auto-scaled Leju frames by x10 (detected height now {actual_human_height:.3f} m)")
+                elif actual_human_height > 2.5:
+                    _scale_human_frames(lafan1_data_frames, 0.1)
+                    actual_human_height *= 0.1
+                    print(f"[Info] Auto-scaled Leju frames by x0.1 (detected height now {actual_human_height:.3f} m)")
+        else:
+            lafan1_data_frames, actual_human_height = load_bvh_file(args.bvh_file, format=args.format)
+
+        if args.actual_human_height is not None:
+            actual_human_height = args.actual_human_height
+        elif args.format == "leju" and args.robot in ROBOT_DEFAULT_HUMAN_HEIGHT:
+            actual_human_height = ROBOT_DEFAULT_HUMAN_HEIGHT[args.robot]
+            print(f"[Info] Use robot default human height: {actual_human_height:.3f} m")
+        print(f"[Info] actual_human_height used for scaling: {actual_human_height:.3f} m")
+
+        retargeter = GMR(
+            src_human=src_human,
+            tgt_robot=args.robot,
+            actual_human_height=actual_human_height,
+            ik_config_file=str(ik_config_file) if ik_config_file is not None else None,
+        )
+        robot_motion_viewer = RobotMotionViewer(
+            robot_type=args.robot,
+            motion_fps=args.motion_fps,
+            transparent_robot=0,
+            use_scene_xml=args.use_scene_xml,
+            record_video=args.record_video,
+            video_path=args.video_path,
+        )
+
+        qpos_list = []
+        pbar = tqdm(total=len(lafan1_data_frames), desc="Retargeting")
+        i = 0
+        while True:
+            pbar.update(1)
+            qpos = retargeter.retarget(lafan1_data_frames[i])
+            robot_motion_viewer.step(
+                root_pos=qpos[:3],
+                root_rot=qpos[3:7],
+                dof_pos=qpos[7:],
+                human_motion_data=retargeter.scaled_human_data,
+                rate_limit=args.rate_limit,
+                follow_camera=True,
+            )
+            if args.save_path is not None:
+                qpos_list.append(qpos)
+
+            if args.loop:
+                i = (i + 1) % len(lafan1_data_frames)
+            else:
+                i += 1
+                if i >= len(lafan1_data_frames):
+                    break
+
+        if args.save_path is not None:
             root_pos = np.array([q[:3] for q in qpos_list])
-            root_rot = np.array([q[3:7][[1,2,3,0]] for q in qpos_list])
+            root_rot = np.array([q[3:7][[1, 2, 3, 0]] for q in qpos_list])
             dof_pos = np.array([q[7:] for q in qpos_list])
-            local_body_pos = None
-            body_names = None
+            if args.robot == "roban_s14":
+                reduced_dof_pos = np.zeros((dof_pos.shape[0], dof_pos.shape[1] - 2), dtype=dof_pos.dtype)
+                reduced_dof_pos[:, :13] = dof_pos[:, :13]
+                reduced_dof_pos[:, 13:17] = dof_pos[:, 13:17]
+                reduced_dof_pos[:, 17:21] = dof_pos[:, 18:22]
+                dof_pos = reduced_dof_pos
+
             motion_data = {
                 "fps": args.motion_fps,
                 "root_pos": root_pos,
                 "root_rot": root_rot,
                 "dof_pos": dof_pos,
-                "local_body_pos": local_body_pos,
-                "link_body_list": body_names,
+                "local_body_pos": None,
+                "link_body_list": None,
             }
-            with open("output/qpos_list.pkl", "wb") as f:
+            save_dir = os.path.dirname(args.save_path)
+            if save_dir:
+                os.makedirs(save_dir, exist_ok=True)
+            with open(args.save_path, "wb") as f:
                 pickle.dump(motion_data, f)
-            print("Saved to output/qpos_list.pkl")
+            print(f"Saved to {args.save_path}")
 
-            save_qpos_s17_dance_no_head_joint(qpos_list, csv_output_path)
-            # save video and dump as pkl file
-            robot_motion_viewer.close()
-            break
+        pbar.close()
+        robot_motion_viewer.close()
