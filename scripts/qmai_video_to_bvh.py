@@ -38,7 +38,7 @@ def upload_video(args):
         "bonetype": args.bone_type,
         "companyKey": args.key,
         "rollbackUrl": args.rollback_url,
-        "pose_type": args.pose_type,
+        "poseType": args.pose_type,
         "frameRate": args.frame_rate,
         "standPose": args.stand_pose,
         "physicType": args.physic_type,
@@ -58,8 +58,10 @@ def upload_video(args):
 
         # 5. 处理响应
         print("-" * 30)
-        if response.status_code == 200:
-            print("上传成功 (200 OK)")
+        response_data = json.loads(response.text)
+        status = response_data['data']['status']
+        if status == 200:
+            print(f"上传成功 ({status} OK)")
             print("响应内容:")
             print(response.text)
             response_json = response.json()
@@ -67,9 +69,10 @@ def upload_video(args):
             print(video_id)
             return video_id
         else:
-            print(f"上传失败: 状态码 {response.status_code}")
+            print(f"上传失败: 状态码 {status}")
             print("错误详情:")
             print(response.text)
+            return None
 
     except requests.exceptions.RequestException as e:
         print(f"网络请求异常: {str(e)}")
@@ -183,7 +186,7 @@ def main():
     video_id = upload_video(args)
 
     #执行下载
-    if args.is_download:
+    if args.is_download and (video_id != None):
         download_file(args, video_id)
 
 if __name__ == "__main__":       

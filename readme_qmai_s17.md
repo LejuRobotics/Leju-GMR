@@ -1,4 +1,18 @@
-# 1. S17 千面视频上传即文件下载脚本使用说明
+# 1. S17 的bvh_to_csv脚本说明
+
+## 使用示例
+'''bash
+python scripts/bvh_to_robot.py \
+  --bvh_file "output/bvh/*.bvh" \
+  --robot "biped_s17" \
+  --save_path "output/qmai" \
+  --rate_limit \
+  --format "qmai"
+'''
+
+会直接在保存地址输出对应csv文件，目前机器人只支持s17，数据支持lafan1、qmai，保留参数方便添加
+
+# 2. S17 千面视频上传即文件下载脚本使用说明
 
 ## 使用示例
 '''bash
@@ -74,15 +88,3 @@ bonetype: 骨骼类型 \
     8:	    Unity-Anim 格式	            原地动作、帧率选择、物理优化 V2.0	        无 \
     16:	    Warudo-Anim 格式	        原地动作、帧率选择、物理优化 V2.0	        无 \
     15:	    BVH+blendshape.json 格式	原地动作、帧率选择、物理优化 V2.0	        选择身体捕捉和手捕，只会输出BVH文件选择身体捕捉或手捕+面捕，会输出BVH文件+blendshape.json件
-
-
-# 2. S17 qmai的bvh_to_csv脚本说明
-
-## 使用示例
-'''bash
-python scripts/qmai_bvh_to_csv_s17.py \
-  --bvh_file output/bvh/*.bvh \
-  --save_path output/qmai
-'''
-
-会直接在保存地址输出视频文件和对应csv文件，默认s17

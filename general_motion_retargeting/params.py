@@ -19,6 +19,7 @@ IK_CONFIG_DICT = {
     "bvh_lafan1":{
         "roban_s14": IK_CONFIG_ROOT / "bvh_lafan1_to_robans14.json",
         "kuavo_s52": IK_CONFIG_ROOT / "bvh_lafan1_to_kuavos52.json",
+        "biped_s17": IK_CONFIG_ROOT / "bvh_lafan1_to_s17.json",
     },
     "bvh_nokov":{
         #
@@ -26,6 +27,7 @@ IK_CONFIG_DICT = {
     "bvh_leju":{
         "roban_s14": IK_CONFIG_ROOT / "bvh_leju_to_robans14.json",
         "kuavo_s52": IK_CONFIG_ROOT / "bvh_leju_to_kuavos52.json",
+        "biped_s17": IK_CONFIG_ROOT / "bvh_leju_to_s17.json",
     },
     "fbx":{
         #
