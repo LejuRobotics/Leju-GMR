@@ -143,37 +143,6 @@ def convert_qpos_old_to_new_urdf(qpos):
     
     return new_qpos
 
-
-def save_qpos_s17_dance_no_head_joint(qpos_list, filepath):
-    """Save qpos_list to CSV file for biped_s17.
-    
-    注意：CSV中保存的是基于XML的原始qpos（base_link=waist），不做URDF转换。
-    URDF转换（waist→torso）在csv_to_npz_s22.py中插值完成后进行，
-    避免slerp/lerp分别插值root_rot和waist_yaw导致的不一致问题。
-    """
-    import csv
-    if not qpos_list:
-        print(f"Warning: qpos_list is empty, nothing to save to {filepath}")
-        return
-
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-
-    with open(filepath, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-
-        # Write data
-        targetMaxFrame = 8633
-        for frame_idx, qpos in enumerate(qpos_list):
-            if frame_idx > targetMaxFrame:
-                continue
-            row = []
-            row.extend(qpos[:3])  # Root position
-            row.extend([qpos[4], qpos[5], qpos[6], qpos[3]])  # Root rotation (wxyz to xyzw)
-            row.extend(qpos[7:28])  # Joint positions (21 joints, no head: 12 leg + 1 waist + 8 arm)
-            writer.writerow(row)
-    print(f"Saved s17 dance data to {filepath} with {min(len(qpos_list), targetMaxFrame)} frames (21 joints: 12 leg + 1 waist + 8 arm, no head)")
-
-
 def load_leju_bvh_file_s17(bvh_file):
     """Load leju BVH file for biped_s17."""
     data = read_bvh(bvh_file)
@@ -359,21 +328,21 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--format",
-        choices=["lafan1", "qmai", "leju"],
+        choices=["lafan1", "qmai", "leju", "nokov"],
         default="qmai",
     )
 
     parser.add_argument(
         "--loop",
-        default=False,
+        default=True,
         action="store_true",
         help="Loop the motion.",
     )
 
     parser.add_argument(
         "--robot",
-        choices=["biped_s17"],
-        default="biped_s17",
+        choices=["roban_s17"],
+        default="roban_s17",
     )
 
     parser.add_argument(
@@ -391,7 +360,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--rate_limit",
         action="store_true",
-        default=True,
+        default=False,
     )
 
     parser.add_argument(
@@ -413,28 +382,26 @@ if __name__ == "__main__":
     bvh_file_path = args.bvh_file  # 只需要文件名
     
     # 自动生成相关路径
-    bvh_filename = os.path.basename(bvh_file_path)
-    base_name = os.path.splitext(bvh_filename)[0]  # 去掉.bvh扩展名
     json_file_path = IK_CONFIG_DICT[f"bvh_{args.format}"][args.robot]
     video_output_path = args.video_path
-    csv_output_path = os.path.join(args.save_path, f"{base_name}.csv")
+    pkl_output_path = args.save_path
     
     print(f"[配置] BVH文件: {bvh_file_path}")
     print(f"[配置] JSON配置: {json_file_path}")
     print(f"[配置] 视频输出: {video_output_path}")
-    print(f"[配置] CSV输出: {csv_output_path}")
+    print(f"[配置] PKL输出: {pkl_output_path}")
     
     # Load BVH file
     if args.format == "qmai":
         mocap_data, actual_human_height = load_qmai_bvh_for_biped_s17(
             bvh_file=bvh_file_path
         )
-    elif args.format == "lafan1":
-        mocap_data, actual_human_height = load_lafan1_file_for_biped_s17(
-            bvh_file=bvh_file_path
-        )
     elif args.format == "leju":
         mocap_data, actual_human_height = load_leju_bvh_file_s17(
+            bvh_file=bvh_file_path
+        )
+    else:
+        mocap_data, actual_human_height = load_lafan1_file_for_biped_s17(
             bvh_file=bvh_file_path
         )
 
@@ -517,10 +484,17 @@ if __name__ == "__main__":
             root_rot=qpos[3:7],
             dof_pos=qpos[7:],
             human_motion_data=scaled_human_data,
-            rate_limit=False,  # No rate limiting
+            rate_limit=args.rate_limit,  # No rate limiting
             follow_camera=True,
         )
-        i = (i + 1) % len(mocap_data)
+
+        if args.loop:
+            i = (i + 1) % len(mocap_data)
+        else:
+            i += 1
+            if i >= len(mocap_data):
+                break
+
         qpos_list.append(qpos)
         
         # Pause at frame 10 for inspection
@@ -542,11 +516,11 @@ if __name__ == "__main__":
                 "local_body_pos": local_body_pos,
                 "link_body_list": body_names,
             }
-            with open("output/qpos_list.pkl", "wb") as f:
+            os.makedirs(os.path.dirname(pkl_output_path), exist_ok=True)
+            with open(pkl_output_path, "wb") as f:
                 pickle.dump(motion_data, f)
-            print("Saved to output/qpos_list.pkl")
+            print(f"Saved to {pkl_output_path}")
 
-            save_qpos_s17_dance_no_head_joint(qpos_list, csv_output_path)
             # save video and dump as pkl file
             robot_motion_viewer.close()
             break

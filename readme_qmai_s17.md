@@ -1,18 +1,4 @@
-# 1. S17 的bvh_to_csv脚本说明
-
-## 使用示例
-'''bash
-python scripts/bvh_to_robot.py \
-  --bvh_file "output/bvh/*.bvh" \
-  --robot "biped_s17" \
-  --save_path "output/qmai" \
-  --rate_limit \
-  --format "qmai"
-'''
-
-会直接在保存地址输出对应csv文件，目前机器人只支持s17，数据支持lafan1、qmai，保留参数方便添加
-
-# 2. S17 千面视频上传即文件下载脚本使用说明
+# S17 千面视频上传即文件下载脚本使用说明
 
 ## 使用示例
 '''bash

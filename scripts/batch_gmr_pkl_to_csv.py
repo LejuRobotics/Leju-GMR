@@ -1,7 +1,7 @@
 import argparse
 import pickle
 import os
-
+import csv
 import numpy as np
 
 if __name__ == "__main__":
@@ -11,9 +11,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    out_folder = os.path.join(args.folder, "csv")
-    os.makedirs(out_folder, exist_ok=True)
-
     for i, file in enumerate(os.listdir(args.folder)):
         if file.endswith(".pkl"):
             with open(os.path.join(args.folder, file), "rb") as f:
@@ -21,25 +18,35 @@ if __name__ == "__main__":
         else:
             continue
 
-        dof_pos = motion_data["dof_pos"]
         frame_rate = motion_data["fps"]            
-        motion = np.zeros((dof_pos.shape[0], dof_pos.shape[1] + 7), dtype=np.float32)
-        motion[:, :3] = motion_data["root_pos"]
-        motion[:, 3:7] = motion_data["root_rot"][:, [3, 0, 1, 2]] # from xyzw to wxyz align with beyondmimic
-        motion[:, 7:] = dof_pos
-        
-        if frame_rate > 30:
-            # downsample to 30 fps
-            downsample_factor = frame_rate / 30.0
-            indices = np.arange(0, motion.shape[0], downsample_factor).astype(int)
-            old_length = motion.shape[0]
-            motion = motion[indices]
-            print(f"Downsampled from {old_length} to {motion.shape[0]} frames")
-        
+        root_pos = motion_data["root_pos"]
+        root_rot = motion_data["root_rot"][:, [3, 0, 1, 2]] # from xyzw to wxyz align with beyondmimic
+        dof_pos = motion_data["dof_pos"]
 
-        np.savetxt(
-            os.path.join(args.folder, "csv", file.replace(".pkl", ".csv")),
-            motion,
-            delimiter=",",
-        )
-        print(f"({i}/{len(os.listdir(args.folder))}) Saved to {os.path.join(args.folder, 'csv', file.replace('.pkl', '.csv'))}")
+        qpos_list = []
+        for j in range(len(root_pos)):
+            # 拼接: [pos(3), rot(4), dof(N)]
+            q = np.concatenate([root_pos[j], root_rot[j], dof_pos[j]])
+            qpos_list.append(q)
+        
+        filepath = os.path.join(args.folder, "csv", file.replace(".pkl", ".csv"))
+        if not qpos_list:
+            print(f"Warning: qpos_list is empty, nothing to save to {filepath}")
+            break
+
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        with open(filepath, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+
+            # Write data
+            targetMaxFrame = 8633
+            for frame_idx, qpos in enumerate(qpos_list):
+                if frame_idx > targetMaxFrame:
+                    continue
+                row = []
+                row.extend(qpos[:3])  # Root position
+                row.extend([qpos[4], qpos[5], qpos[6], qpos[3]])  # Root rotation (wxyz to xyzw)
+                row.extend(qpos[7:])  # Joint positions (21 joints, no head: 12 leg + 1 waist + 8 arm)
+                writer.writerow(row)
+        print(f"Saved to {filepath}")
