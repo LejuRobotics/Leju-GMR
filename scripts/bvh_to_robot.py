@@ -430,40 +430,8 @@ if __name__ == "__main__":
     fps_display_interval = 2.0  # Display FPS every 2 seconds
     pbar = tqdm(total=len(mocap_data), desc="Retargeting")
     i = 0
-    
-    # 暂停控制变量
-    is_paused = False
-    print("\n" + "="*60)
-    print("[提示] 播放过程中按 Enter 键可以暂停/恢复播放")
-    print("[提示] 暂停时会显示当前帧数")
-    print("[提示] 使用 Ctrl+C 可以退出程序")
-    print("="*60 + "\n")
-
-    def check_for_enter_key():
-        """检查是否按下Enter键(非阻塞)"""
-        if select.select([sys.stdin], [], [], 0)[0]:
-            input()  # 读取并清空输入缓冲区
-            return True
-        return False
 
     while True:
-        # 检查是否按下Enter键
-        if check_for_enter_key():
-            is_paused = not is_paused
-            if is_paused:
-                print(f"\n{'='*60}")
-                print(f"[暂停] 当前帧: {i}/{len(mocap_data)-1} (总帧数: {len(mocap_data)})")
-                print(f"[暂停] 已处理帧数: {len(qpos_list)}")
-                print(f"[暂停] 按 Enter 键继续播放...")
-                print(f"{'='*60}\n")
-            else:
-                print(f"\n[继续] 恢复播放...\n")
-        
-        # 如果暂停,继续检查输入但不处理帧
-        if is_paused:
-            time.sleep(0.01)  # 避免CPU占用过高
-            continue
-        
         # FPS measurement
         fps_counter += 1
         current_time = time.time()
@@ -496,10 +464,6 @@ if __name__ == "__main__":
                 break
 
         qpos_list.append(qpos)
-        
-        # Pause at frame 10 for inspection
-        if i == 1: 
-            input("Press Enter to continue to next frame... (or Ctrl+C to quit)")
 
         if i == 0:
             # dump to pickle - 保持XML原始qpos（base_link=waist）
