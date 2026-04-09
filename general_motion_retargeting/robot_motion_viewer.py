@@ -48,7 +48,6 @@ class RobotMotionViewer:
                 camera_follow=True,
                 motion_fps=30,
                 transparent_robot=0,
-                use_scene_xml=False,
                 # video recording
                 record_video=False,
                 video_path=None,
@@ -59,11 +58,6 @@ class RobotMotionViewer:
         
         self.robot_type = robot_type
         self.xml_path = ROBOT_XML_DICT[robot_type]
-        if use_scene_xml:
-            scene_xml_path = self.xml_path.parent / "scene.xml"
-            if scene_xml_path.exists():
-                self.xml_path = scene_xml_path
-        print(f"[Viewer] Use XML: {self.xml_path}")
         self.model = mj.MjModel.from_xml_path(str(self.xml_path))
         self.data = mj.MjData(self.model)
         self.robot_base = ROBOT_BASE_DICT[robot_type]

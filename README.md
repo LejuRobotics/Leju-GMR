@@ -258,4 +258,3 @@ python transfer/batch_gmr_pkl_to_csv.py --folder /path/to/pkl/files
 | 0 | Kuavo S52 `kuavo_s52` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | ✅ | TBD |  ✅ | TBD |
 | 1 | Roban S14 `roban_s14` | Leg (2\*6) + Waist (1) + Arm (2\*5) = 23 | TBD | ✅ | TBD | ✅ | TBD |
 | 2 | Kuavo S45 `kuavo_s45` | Leg (2\*6) + Arm (2\*7) = 26 | ✅ | TBD | TBD | TBD | TBD |
-| 3 | Kuavo S54 `kuavo_s54` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | TBD | TBD | ✅ | TBD |
