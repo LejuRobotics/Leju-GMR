@@ -9,6 +9,7 @@ ROBOT_XML_DICT = {
     "roban_s17": ASSET_ROOT / "biped_s17" / "xml" / "biped_s17.xml",
     "kuavo_s52": ASSET_ROOT / "kuavo_s52" / "biped_s52.xml",
     "kuavo_s45": ASSET_ROOT / "kuavo_s45" / "biped_s45_collision.xml",
+    "kuavo_s54": ASSET_ROOT / "kuavo_s54" / "xml" / "biped_s54.xml",
 }
 
 IK_CONFIG_DICT = {
@@ -19,6 +20,7 @@ IK_CONFIG_DICT = {
     "bvh_lafan1":{
         "roban_s14": IK_CONFIG_ROOT / "bvh_lafan1_to_robans14.json",
         "kuavo_s52": IK_CONFIG_ROOT / "bvh_lafan1_to_kuavos52.json",
+        "kuavo_s54": IK_CONFIG_ROOT / "bvh_lafan1_to_kuavos54.json",
         "roban_s17": IK_CONFIG_ROOT / "bvh_lafan1_to_s17.json",
     },
     "bvh_nokov":{
@@ -27,6 +29,7 @@ IK_CONFIG_DICT = {
     "bvh_leju":{
         "roban_s14": IK_CONFIG_ROOT / "bvh_leju_to_robans14.json",
         "kuavo_s52": IK_CONFIG_ROOT / "bvh_leju_to_kuavos52.json",
+        "kuavo_s54": IK_CONFIG_ROOT / "bvh_leju_to_kuavos54.json",
         "roban_s17": IK_CONFIG_ROOT / "bvh_leju_to_s17.json",
     },
     "fbx":{
@@ -48,6 +51,7 @@ ROBOT_BASE_DICT = {
     "roban_s14": "waist_yaw_link",
     "kuavo_s52": "base_link",
     "kuavo_s45": "base_link",
+    "kuavo_s54": "base_link",
     "roban_s17": "base_link",
 }
 
@@ -55,5 +59,6 @@ VIEWER_CAM_DISTANCE_DICT = {
     "roban_s14": 3.0,
     "kuavo_s52": 3.0,
     "kuavo_s45": 3.0,
+    "kuavo_s54": 3.0,
     "roban_s17": 2.0,
 }
