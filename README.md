@@ -60,12 +60,14 @@ conda install -c conda-forge libstdcxx-ng -y
 
 ```bash
 # single motion
-python scripts/bvh_to_robot.py \
---bvh_file output/BVH/leju/dance_bj_01_Skeleton_002.bvh \
---robot roban_s14 \
---save_path output/PKL/roban_dance.pkl \
---rate_limit \
---format leju
+python scripts/bvh_to_pkl.py \
+   --bvh_file output/BVH/leju/dance_bj_01_Skeleton_002.bvh \
+   --bvh_fps 100  \
+   --robot roban_s17  \
+   --motion_fps 50  \
+   --rate_limit   \
+   --format leju \
+   --record_video_path
 ```
 
 ## 4、数据准备
@@ -109,18 +111,21 @@ python scripts/bvh_to_robot.py \
 
 ## 6、使用
 
-### 6.1、从BVH重定向至机器人(推荐使用，适配kuavo_s52与roban_s14)
+### 6.1、从BVH重定向至机器人
 
 (1)重定向单个动作
 
 ```bash
-# single motion
-python scripts/bvh_to_robot.py \
+python scripts/bvh_to_pkl.py \
 --bvh_file <path_to_bvh_data> \
---robot <path_to_robot_data> \
---save_path <path_to_save_robot_data.pkl> \
+--bvh_fps <source_bvh_fps> \
+--robot <robot_name> \
+--save_path <path_or_dir_to_save_robot_data.pkl> \
 --rate_limit \
---format <format>
+--format <format> \
+--motion_fps <target_motion_fps> \
+--bvh_unit <auto|mm|cm|m> \
+--record_video_path [video_path]
 ```
 
 默认情况下，MuJoCo 窗口中展示重定向后机器人动作的可视化效果。
@@ -129,17 +134,27 @@ python scripts/bvh_to_robot.py \
 
 * `--bvh_file`:指定要处理的 BVH 文件路径，此参数为必填参数。
 
-* `--robot`:指定运动重定向的目标机器人型号。
+* `--bvh_fps`:源 BVH 帧率（Hz），必填参数。
 
-* `--save_path`:指定运动重定向文件保存路径，默认值为不保存。
+* `--robot`:指定运动重定向的目标机器人型号，当前支持`roban_s17`、`roban_s14`、`kuavo_s52`、`kuavo_s54`。
+
+* `--save_path`:输出路径（可选）。支持以下模式：
+  - 传入`.pkl`文件路径：按指定文件保存；
+  - 传入目录路径：保存到`<dir>/<robot>/pkl/<bvh_stem>_<fps>.pkl`；
+  - 不传：默认保存到`output/<robot>/pkl/<bvh_stem>_<fps>.pkl`。
 
 * `--rate_limit`:参数用于限制机器人的运动重定向速率，使其与人体运动速率保持一致。若希望机器人以最快速率运动，移除该参数即可。
 
-* `--record_video`:默认`False`，为布尔值参数，可决定是否录制可视化过程为视频
+* `--motion_fps`:目标输出帧率（Hz，可选）。不指定时默认使用`--bvh_fps`。
 
-* `--video_path`:默认`output/videos/example.mp4`录制视频的保存路径
+* `--bvh_unit`:BVH 位置单位，支持`auto`、`mm`、`cm`、`m`，默认`auto`。若已知单位，建议显式指定（如`--bvh_unit cm`）。
 
-* `--format`: 指定人体动画数据的格&#x5F0F;**。**&#x4EC5;支持`"leju", "lafan1", "nokov"`三种解析格式，默认值为`leju`。决定 BVH 文件的加载方式，`format=leju`时调用`load_leju_bvh_file`；否则调用`load_bvh_file`并传入`format`参数。
+* `--record_video_path [video_path]`:可视化录制参数（可选）：
+  - 不传：不录制视频；
+  - 仅传`--record_video_path`：默认保存到`output/<robot>/videos/<pkl_stem>.mp4`；
+  - 传具体路径：按指定路径保存视频。
+
+* `--format`:指定人体动画数据格式。支持`"leju", "lafan1", "qmai", "nokov"`。
 
 (2)重定向文件夹中的批量动作：
 
@@ -234,7 +249,7 @@ python scripts/vis_robot_motion_dataset.py \
 - 基本用法
 
 ```bash
-python transfer/batch_gmr_pkl_to_csv.py --folder <包含pkl文件的文件夹路径>
+python scripts/batch_gmr_pkl_to_csv.py --folder <包含pkl文件的文件夹路径>
 ```
 
 -  参数说明
@@ -255,6 +270,8 @@ python transfer/batch_gmr_pkl_to_csv.py --folder /path/to/pkl/files
 
 | Assigned ID | Robot/Data Format | Robot DoF | SMPLX ([AMASS](https://amass.is.tue.mpg.de/), [OMOMO](https://github.com/lijiaman/omomo_release)) | BVH [LAFAN1](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)| FBX ([OptiTrack](https://www.optitrack.com/)) |  BVH (Leju) | PICO ([XRoboToolkit](https://github.com/XR-Robotics/XRoboToolkit-PC-Service)) | More formats coming soon | 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | Kuavo S52 `kuavo_s52` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | ✅ | TBD |  ✅ | TBD |
 | 1 | Roban S14 `roban_s14` | Leg (2\*6) + Waist (1) + Arm (2\*5) = 23 | TBD | ✅ | TBD | ✅ | TBD |
-| 2 | Kuavo S45 `kuavo_s45` | Leg (2\*6) + Arm (2\*7) = 26 | ✅ | TBD | TBD | TBD | TBD |
+| 2 | Roban S17 `roban_s17` | Leg (2\*6) + Waist (1) + Arm (2\*5) = 23 | TBD | TBD | TBD | ✅ | TBD |
+| 3 | Kuavo S45 `kuavo_s45` | Leg (2\*6) + Arm (2\*7) = 26 | ✅ | TBD | TBD | TBD | TBD |
+| 4 | Kuavo S52 `kuavo_s52` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | ✅ | TBD |  ✅ | TBD |
+| 5 | Kuavo S54 `kuavo_s54` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | TBD | TBD |  ✅ | TBD |
