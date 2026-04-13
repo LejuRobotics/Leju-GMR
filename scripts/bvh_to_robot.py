@@ -231,7 +231,7 @@ class BipedS17GMR(GeneralMotionRetargeting):
 
         # Load the IK config for biped_s17
         if ik_config_file is None:
-            ik_config_file = HERE / "biped_s17_qmai_retarget.json"
+            ik_config_file = "general_motion_retargeting/ik_configs/bvh_qmai_to_s17.json"
         with open(ik_config_file) as f:
             ik_config = json.load(f)
         if verbose:

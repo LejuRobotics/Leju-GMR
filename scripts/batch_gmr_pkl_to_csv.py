@@ -47,6 +47,6 @@ if __name__ == "__main__":
                 row = []
                 row.extend(qpos[:3])  # Root position
                 row.extend([qpos[4], qpos[5], qpos[6], qpos[3]])  # Root rotation (wxyz to xyzw)
-                row.extend(qpos[7:])  # Joint positions (21 joints, no head: 12 leg + 1 waist + 8 arm)
+                row.extend(qpos[7:])  # Joint positions
                 writer.writerow(row)
         print(f"Saved to {filepath}")
