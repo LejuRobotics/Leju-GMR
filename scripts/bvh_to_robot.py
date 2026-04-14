@@ -22,7 +22,7 @@ from general_motion_retargeting.params import IK_CONFIG_DICT
 
 HERE = pathlib.Path(__file__).parent
 
-def load_lafan1_file_for_biped_s17(bvh_file):
+def load_lafan1_bvh(bvh_file):
     """
     Must return a dictionary with the following structure:
     {
@@ -59,7 +59,7 @@ def load_lafan1_file_for_biped_s17(bvh_file):
 
     return frames, human_height
 
-def load_qmai_bvh_for_biped_s17(bvh_file):
+def load_qmai_bvh(bvh_file):
     """Load qmai BVH file for biped_s17."""
     data = qmai_read_bvh(bvh_file)
     global_data = utils.quat_fk(data.quats, data.pos, data.parents)
@@ -143,8 +143,38 @@ def convert_qpos_old_to_new_urdf(qpos):
     
     return new_qpos
 
-def load_leju_bvh_file_s17(bvh_file):
+def load_leju_bvh(bvh_file):
     """Load leju BVH file for biped_s17."""
+
+    # from mocap format to kuavo format
+    name_mapping = {
+        "Skeleton": "Hips",
+        "Chest": "Spine",
+
+        "Neck": "Neck",
+        "Head": "Head",
+        
+        "LShoulder": "LeftShoulder",
+        "LUArm": "LeftArm",
+        "LFArm": "LeftForeArm",
+        "LHand": "LeftHand",
+        
+        "RShoulder": "RightShoulder",
+        "RUArm": "RightArm",
+        "RFArm": "RightForeArm",
+        "RHand": "RightHand",
+        
+        "LThigh": "LeftUpLeg",
+        "LShin": "LeftLeg",
+        "LFoot": "LeftFoot",
+        "LToe": "LeftToeBase",
+
+        "RThigh": "RightUpLeg",
+        "RShin": "RightLeg",
+        "RFoot": "RightFoot",
+        "RToe": "RightToeBase",
+    }
+
     data = read_bvh(bvh_file)
     global_data = utils.quat_fk(data.quats, data.pos, data.parents)
 
@@ -155,12 +185,27 @@ def load_leju_bvh_file_s17(bvh_file):
 
     frames = []
     for frame in range(data.pos.shape[0]):
-        result = {}
+        original_result = {}
+
+        is_old_format = "Skeleton" in data.bones
+        if is_old_format:
+            scale_factor = 1000
+        else:
+            scale_factor = 100
+
         for i, bone in enumerate(data.bones):
             orientation = utils.quat_mul(rotation_quat, global_data[0][frame, i])
             # dance_bj_01 uses mm, convert to m: mm -> m = / 1000
-            position = global_data[1][frame, i] @ rotation_matrix.T / 100  # mm to m
-            result[bone] = (position, orientation)
+            position = global_data[1][frame, i] @ rotation_matrix.T / scale_factor  # mm to m
+            original_result[bone] = (position, orientation)
+
+        # 如果是老格式就映射
+        if is_old_format:
+            result = {}
+            for key in name_mapping.keys():
+                result[name_mapping[key]] = original_result[key]
+        else:
+            result = original_result.copy()
 
         # Add modified foot pose for dance_bj format
         if "LFoot" in result and "LToe" in result:
@@ -393,15 +438,15 @@ if __name__ == "__main__":
     
     # Load BVH file
     if args.format == "qmai":
-        mocap_data, actual_human_height = load_qmai_bvh_for_biped_s17(
+        mocap_data, actual_human_height = load_qmai_bvh(
             bvh_file=bvh_file_path
         )
     elif args.format == "leju":
-        mocap_data, actual_human_height = load_leju_bvh_file_s17(
+        mocap_data, actual_human_height = load_leju_bvh(
             bvh_file=bvh_file_path
         )
     else:
-        mocap_data, actual_human_height = load_lafan1_file_for_biped_s17(
+        mocap_data, actual_human_height = load_lafan1_bvh(
             bvh_file=bvh_file_path
         )
 
