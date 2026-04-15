@@ -1,6 +1,5 @@
 # Standard library
 import argparse
-import json
 import os
 import pathlib
 import pickle
@@ -19,7 +18,6 @@ if repo_root_str not in sys.path:
     sys.path.insert(0, repo_root_str)
 
 # Third-party
-import mink
 import mujoco as mj
 import numpy as np
 from scipy.spatial.transform import Rotation as R
@@ -61,7 +59,7 @@ class RobotAdapter:
     """Container for robot-specific retargeting behaviors."""
     build_preprocessor: Callable[[str, pathlib.Path, float], Any]
     load_motion_data: Callable[[str, str, float], tuple[list[dict], float]]
-    validate_qpos: Callable[[np.ndarray], None]
+    validate_qpos: Callable[[np.ndarray, int], None]
     postprocess_qpos: Callable[[np.ndarray], np.ndarray]
 
 
@@ -138,7 +136,14 @@ def print_keyboard_help() -> None:
     print("[Control]   Space: pause/resume")
     print("[Control]   N:     step one frame (when paused)")
     print("[Control]   Q:     quit")
+    print("[Control]   Ctrl+C: stop (same as quit when stdin is a TTY)")
     print("[Control] Initial state: paused")
+
+
+# Sentinel: returned by TerminalKeyReader.read_action_nonblocking when select() is
+# interrupted by SIGINT/EINTR. Not a real key; avoids KeyboardInterrupt escaping the
+# main loop so cbreak mode is restored via __exit__ before closing the viewer.
+TERMINAL_INTERRUPT_ACTION = "__terminal_interrupt__"
 
 
 class TerminalKeyReader:
@@ -172,11 +177,21 @@ class TerminalKeyReader:
             )
 
     def read_action_nonblocking(self) -> Optional[str]:
-        """Read one terminal action key without blocking."""
+        """Poll stdin for one control key without blocking (cbreak mode).
+
+        Returns:
+            "SPACE", "N", or "Q" for recognized keys; TERMINAL_INTERRUPT_ACTION if
+            Ctrl+C or an interrupted select occurs; None if disabled, no data ready,
+            or an unrecognized byte.
+        """
         if not self._enabled:
             return None
 
-        ready_inputs, _, _ = select.select([sys.stdin], [], [], 0.0)
+        try:
+            ready_inputs, _, _ = select.select([sys.stdin], [], [], 0.0)
+        except (KeyboardInterrupt, InterruptedError):
+            # Do not propagate: caller treats as graceful stop so __exit__ runs first.
+            return TERMINAL_INTERRUPT_ACTION
         if not ready_inputs:
             return None
 
@@ -559,55 +574,6 @@ def load_bvh_qmai_common(bvh_file: str, position_scale_to_meter: float):
     return frames, human_height
 
 
-def convert_qpos_roban_s17_old_to_new_urdf(qpos):
-    """
-    将基于旧URDF（base_link=waist）的qpos转换为新URDF（base_link=torso）的qpos。
-    
-    旧URDF结构: base_link(waist) -> waist_yaw_joint(z轴) -> waist_yaw_link(torso)
-    新URDF结构: base_link(torso) -> waist_yaw_joint(z轴) -> waist_yaw_link(waist)
-    
-    XML中的qpos布局:
-      qpos[0:3]  = root position
-      qpos[3:7]  = root rotation (wxyz)
-      qpos[7:19] = 12个腿关节 (leg_l1~l6, leg_r1~r6)
-      qpos[19]   = waist_yaw_joint
-      qpos[20:28]= 8个手臂关节 (zarm_l1~l4, zarm_r1~r4)
-      qpos[28:30]= 2个头部关节 (zhead_1, zhead_2)
-    
-    转换关系:
-      新base_link_rot(torso) = 旧base_link_rot(waist) * Rz(waist_yaw_angle)
-      新waist_yaw_angle = -旧waist_yaw_angle
-    """
-    WAIST_YAW_IDX = 19  # waist_yaw_joint 在 qpos 中的索引
-    
-    new_qpos = qpos.copy()
-    
-    # 提取旧的root rotation (wxyz格式) 和 waist_yaw角度
-    old_root_rot_wxyz = qpos[3:7]  # [w, x, y, z]
-    old_waist_yaw_angle = qpos[WAIST_YAW_IDX]
-    
-    # 将root rot从wxyz转为scipy的xyzw格式
-    old_root_rot_xyzw = [old_root_rot_wxyz[1], old_root_rot_wxyz[2], old_root_rot_wxyz[3], old_root_rot_wxyz[0]]
-    old_root_rot = R.from_quat(old_root_rot_xyzw)
-    
-    # 构造waist_yaw的旋转 Rz(theta)
-    waist_yaw_rot = R.from_rotvec([0, 0, old_waist_yaw_angle])
-    
-    # 新的root_rot(torso) = 旧的root_rot(waist) * Rz(waist_yaw_angle)
-    new_root_rot = old_root_rot * waist_yaw_rot
-    
-    # 转回wxyz格式
-    new_root_rot_xyzw = new_root_rot.as_quat()  # [x, y, z, w]
-    new_qpos[3] = new_root_rot_xyzw[3]  # w
-    new_qpos[4] = new_root_rot_xyzw[0]  # x
-    new_qpos[5] = new_root_rot_xyzw[1]  # y
-    new_qpos[6] = new_root_rot_xyzw[2]  # z
-    
-    # 新的waist_yaw角度取反
-    new_qpos[WAIST_YAW_IDX] = -old_waist_yaw_angle
-    
-    return new_qpos
-
 def load_bvh_leju_common(bvh_file: str, position_scale_to_meter: float):
     """Load leju BVH file and normalize naming variants to canonical keys."""
     data = read_bvh(bvh_file)
@@ -646,138 +612,6 @@ def load_bvh_leju_common(bvh_file: str, position_scale_to_meter: float):
         human_height = 1.75  # default value
 
     return frames, human_height
-
-
-class RobanS17GMR(GeneralMotionRetargeting):
-    """Robot-specific GMR implementation for roban_s17."""
-    def __init__(
-        self,
-        actual_human_height: float = None,
-        solver: str="daqp",
-        damping: float=5e-1,
-        verbose: bool=True,
-        use_velocity_limit: bool=False,
-        contact_sequence: Dict[str, np.ndarray] = None,
-        ik_config_file: str = None,  # Optional external IK config path.
-    ) -> None:
-        # used for contact offset
-        self.contact_sequence = contact_sequence
-        self.previous_human_data = None
-
-        # Load roban_s17 model.
-        self.xml_file = str(HERE / ".." / "assets" / "biped_s17" / "xml" / "biped_s17.xml")
-
-        if verbose:
-            print("Use robot model: ", self.xml_file)
-        self.model = mj.MjModel.from_xml_path(self.xml_file)
-        
-        # Print DoF names in order
-        print("[GMR] Robot Degrees of Freedom (DoF) names and their order:")
-        self.robot_dof_names = {}
-        for i in range(self.model.nv):  # 'nv' is the number of DoFs
-            dof_name = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_JOINT, self.model.dof_jntid[i])
-            self.robot_dof_names[dof_name] = i
-            if verbose:
-                print(f"DoF {i}: {dof_name}")
-            
-            
-        print("[GMR] Robot Body names and their IDs:")
-        self.robot_body_names = {}
-        for i in range(self.model.nbody):  # 'nbody' is the number of bodies
-            body_name = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_BODY, i)
-            self.robot_body_names[body_name] = i
-            if verbose:
-                print(f"Body ID {i}: {body_name}")
-        
-        print("[GMR] Robot Motor (Actuator) names and their IDs:")
-        self.robot_motor_names = {}
-        for i in range(self.model.nu):  # 'nu' is the number of actuators (motors)
-            motor_name = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_ACTUATOR, i)
-            self.robot_motor_names[motor_name] = i
-            if verbose:
-                print(f"Motor ID {i}: {motor_name}")
-
-        # Load roban_s17 IK config.
-        if ik_config_file is None:
-            ik_config_file = HERE / "biped_s17_qmai_retarget.json"
-        with open(ik_config_file) as f:
-            ik_config = json.load(f)
-        if verbose:
-            print("Use IK config: ", ik_config_file)
-        
-        # compute the scale ratio based on given human height and the assumption in the IK config
-        if actual_human_height is not None:
-            ratio = actual_human_height / ik_config["human_height_assumption"]
-        else:
-            ratio = 1.0
-            
-        # adjust the human scale table
-        for key in ik_config["human_scale_table"].keys():
-            ik_config["human_scale_table"][key] = ik_config["human_scale_table"][key] * ratio
-    
-
-        # used for retargeting
-        self.ik_match_table1 = ik_config["ik_match_table1"]
-        self.ik_match_table2 = ik_config["ik_match_table2"]
-        self.human_root_name = ik_config["human_root_name"]
-        self.robot_root_name = ik_config["robot_root_name"]
-        self.use_ik_match_table1 = ik_config["use_ik_match_table1"]
-        self.use_ik_match_table2 = ik_config["use_ik_match_table2"]
-        self.human_scale_table = ik_config["human_scale_table"]
-        self.ground = ik_config["ground_height"] * np.array([0, 0, 1])
-
-        self.max_iter = 10
-
-        self.solver = solver
-        self.damping = damping
-
-        self.human_body_to_task1 = {}
-        self.human_body_to_task2 = {}
-        self.pos_offsets1 = {}
-        self.rot_offsets1 = {}
-        self.pos_offsets2 = {}
-        self.rot_offsets2 = {}
-
-        self.task_errors1 = {}
-        self.task_errors2 = {}
-
-        self.ik_limits = [mink.ConfigurationLimit(self.model)]
-        if use_velocity_limit:
-            # Use joint names (not motor names) for velocity limits
-            # Exclude the dummy_to_base_link joint (free joint)
-            VELOCITY_LIMITS = {}
-            for joint_name in self.robot_dof_names.keys():
-                if joint_name != 'dummy_to_base_link':
-                    VELOCITY_LIMITS[joint_name] = 3*np.pi
-            self.ik_limits.append(mink.VelocityLimit(self.model, VELOCITY_LIMITS)) 
-            
-        self.setup_retarget_configuration()
-        
-        self.ground_offset = 0.0
-
-    def scale_human_data(self, human_data, human_root_name, human_scale_table):
-        
-        human_data_local = {}
-        root_pos, root_quat = human_data[human_root_name]
-        
-        # scale root
-        scaled_root_pos = human_scale_table[human_root_name] * root_pos
-        
-        # scale other body parts in local frame
-        for body_name in human_data.keys():
-            if body_name not in human_scale_table:
-                continue
-            if body_name == human_root_name:
-                continue
-            else:
-                human_data_local[body_name] = (human_data[body_name][0] - root_pos) * human_scale_table[body_name]
-
-        # transform the human data back to the global frame
-        human_data_global = {human_root_name: (scaled_root_pos, root_quat)}
-        for body_name in human_data_local.keys():
-            human_data_global[body_name] = (human_data_local[body_name] + scaled_root_pos, human_data[body_name][1])
-
-        return human_data_global
 
 
 def _load_motion_data_common_by_format(
@@ -906,24 +740,36 @@ def load_motion_data_kuavo_s52(
     return normalized_motion_frames, actual_human_height
 
 
+def _build_gmr_preprocessor(
+    *,
+    bvh_format: str,
+    tgt_robot: str,
+    actual_human_height: float,
+    use_velocity_limit: bool = False,
+) -> GeneralMotionRetargeting:
+    """Shared ``GeneralMotionRetargeting`` factory (IK/XML from ``params.IK_CONFIG_DICT`` / ``ROBOT_XML_DICT``)."""
+    return GeneralMotionRetargeting(
+        src_human=f"bvh_{bvh_format}",
+        tgt_robot=tgt_robot,
+        actual_human_height=actual_human_height,
+        solver="daqp",
+        damping=5e-1,
+        verbose=True,
+        use_velocity_limit=use_velocity_limit,
+    )
+
+
 def build_preprocessor_roban_s17(
     bvh_format: str,
     ik_config_file: pathlib.Path,
     actual_human_height: float,
 ):
-    """
-    roban_s17 specific preprocessor builder.
-    Keep existing roban_s17 behavior unchanged to avoid regressions.
-    """
-    _ = bvh_format
-    _ = actual_human_height
-    return RobanS17GMR(
-        actual_human_height=1.57,
-        solver="daqp",
-        damping=5e-1,
-        verbose=True,
-        use_velocity_limit=True,
-        ik_config_file=str(ik_config_file),
+    """roban_s17：与其它 biped 机型同一 GMR 入口（配置见 ``general_motion_retargeting.params``）。"""
+    _ = ik_config_file
+    return _build_gmr_preprocessor(
+        bvh_format=bvh_format,
+        tgt_robot="roban_s17",
+        actual_human_height=actual_human_height,
     )
 
 
@@ -939,14 +785,10 @@ def build_preprocessor_kuavo_s54(
     - configure solver/limits by robot model characteristics
     """
     _ = ik_config_file
-    return GeneralMotionRetargeting(
-        src_human=f"bvh_{bvh_format}",
+    return _build_gmr_preprocessor(
+        bvh_format=bvh_format,
         tgt_robot="kuavo_s54",
         actual_human_height=actual_human_height,
-        solver="daqp",
-        damping=5e-1,
-        verbose=True,
-        use_velocity_limit=False,
     )
 
 
@@ -959,14 +801,10 @@ def build_preprocessor_roban_s14(
     roban_s14 specific preprocessor builder.
     """
     _ = ik_config_file
-    return GeneralMotionRetargeting(
-        src_human=f"bvh_{bvh_format}",
+    return _build_gmr_preprocessor(
+        bvh_format=bvh_format,
         tgt_robot="roban_s14",
         actual_human_height=actual_human_height,
-        solver="daqp",
-        damping=5e-1,
-        verbose=True,
-        use_velocity_limit=False,
     )
 
 
@@ -979,49 +817,42 @@ def build_preprocessor_kuavo_s52(
     kuavo_s52 specific preprocessor builder.
     """
     _ = ik_config_file
-    return GeneralMotionRetargeting(
-        src_human=f"bvh_{bvh_format}",
+    return _build_gmr_preprocessor(
+        bvh_format=bvh_format,
         tgt_robot="kuavo_s52",
         actual_human_height=actual_human_height,
-        solver="daqp",
-        damping=5e-1,
-        verbose=True,
-        use_velocity_limit=False,
     )
 
 
-def validate_qpos_roban_s17(qpos: np.ndarray) -> None:
+def validate_qpos_exact(qpos: np.ndarray, *, robot_name: str, expected_nq: int) -> None:
+    """Validate qpos shape exactly against ``model.nq``."""
+    if qpos.ndim != 1:
+        raise ValueError(f"[{robot_name}] qpos must be 1D, got shape {qpos.shape}")
+    if int(qpos.shape[0]) != int(expected_nq):
+        raise ValueError(
+            f"[{robot_name}] qpos length mismatch: got {qpos.shape[0]}, "
+            f"expected {expected_nq} (model.nq)"
+        )
+
+
+def validate_qpos_roban_s17(qpos: np.ndarray, expected_nq: int) -> None:
     """roban_s17 specific qpos validation."""
-    if qpos.ndim != 1:
-        raise ValueError(f"[roban_s17] qpos must be 1D, got shape {qpos.shape}")
-    if qpos.shape[0] < 30:
-        raise ValueError(f"[roban_s17] qpos length is too small: {qpos.shape[0]}")
+    validate_qpos_exact(qpos, robot_name="roban_s17", expected_nq=expected_nq)
 
 
-def validate_qpos_kuavo_s54(qpos: np.ndarray) -> None:
+def validate_qpos_kuavo_s54(qpos: np.ndarray, expected_nq: int) -> None:
     """kuavo_s54 specific qpos validation."""
-    if qpos.ndim != 1:
-        raise ValueError(f"[kuavo_s54] qpos must be 1D, got shape {qpos.shape}")
-    if qpos.shape[0] < 36:
-        raise ValueError(f"[kuavo_s54] qpos length is too small: {qpos.shape[0]}")
+    validate_qpos_exact(qpos, robot_name="kuavo_s54", expected_nq=expected_nq)
 
 
-def validate_qpos_roban_s14(qpos: np.ndarray) -> None:
+def validate_qpos_roban_s14(qpos: np.ndarray, expected_nq: int) -> None:
     """roban_s14 specific qpos validation."""
-    if qpos.ndim != 1:
-        raise ValueError(f"[roban_s14] qpos must be 1D, got shape {qpos.shape}")
-    # TODO: replace with exact expected dimension after confirming model.nq.
-    if qpos.shape[0] < 20:
-        raise ValueError(f"[roban_s14] qpos length is too small: {qpos.shape[0]}")
+    validate_qpos_exact(qpos, robot_name="roban_s14", expected_nq=expected_nq)
 
 
-def validate_qpos_kuavo_s52(qpos: np.ndarray) -> None:
+def validate_qpos_kuavo_s52(qpos: np.ndarray, expected_nq: int) -> None:
     """kuavo_s52 specific qpos validation."""
-    if qpos.ndim != 1:
-        raise ValueError(f"[kuavo_s52] qpos must be 1D, got shape {qpos.shape}")
-    # TODO: replace with exact expected dimension after confirming model.nq.
-    if qpos.shape[0] < 30:
-        raise ValueError(f"[kuavo_s52] qpos length is too small: {qpos.shape[0]}")
+    validate_qpos_exact(qpos, robot_name="kuavo_s52", expected_nq=expected_nq)
 
 
 def postprocess_qpos_roban_s17(qpos: np.ndarray) -> np.ndarray:
@@ -1070,6 +901,47 @@ ROBOT_ADAPTERS: Dict[str, RobotAdapter] = {
         postprocess_qpos=postprocess_qpos_kuavo_s52,
     ),
 }
+
+# Kuavo / Roban biped knee hinges in this repo; unknown names are skipped.
+_KNEE_HINGE_JOINT_NAMES: tuple[str, ...] = ("leg_l4_joint", "leg_r4_joint")
+
+
+def apply_initial_knee_flexion_bvh_script(
+    preprocessor: Any,
+    flexion_fraction: float,
+    *,
+    knee_joint_names: tuple[str, ...] = _KNEE_HINGE_JOINT_NAMES,
+) -> None:
+    """Set knee hinge qpos from MuJoCo limits before the first retarget (this script only).
+
+    ``flexion_fraction`` in ``[0, 1]``: ``q = lower + fraction * (upper - lower)``, clamped.
+    For typical knees ``range = [extended, max_flex]``, e.g. 0.1 moves 10% of the bend span
+    from the lower limit (slight bend).     No-op if ``flexion_fraction <= 0``.
+
+    Expects ``preprocessor`` to be a ``GeneralMotionRetargeting`` instance (``model``, ``configuration``).
+    """
+    if flexion_fraction <= 0.0:
+        return
+    frac = float(np.clip(flexion_fraction, 0.0, 1.0))
+    model = preprocessor.model
+    data = preprocessor.configuration.data
+    hinge = int(mj.mjtJoint.mjJNT_HINGE)
+
+    for name in knee_joint_names:
+        jid = mj.mj_name2id(model, mj.mjtObj.mjOBJ_JOINT, name)
+        if jid < 0:
+            continue
+        if int(model.jnt_type[jid]) != hinge:
+            continue
+        lo = float(model.jnt_range[jid, 0])
+        hi = float(model.jnt_range[jid, 1])
+        span = hi - lo
+        if span <= 1e-9:
+            continue
+        adr = int(model.jnt_qposadr[jid])
+        data.qpos[adr] = np.clip(lo + frac * span, lo, hi)
+
+    mj.mj_forward(model, data)
 
 
 if __name__ == "__main__":
@@ -1152,7 +1024,31 @@ if __name__ == "__main__":
         help="Target output frame rate in Hz. If omitted, uses --bvh_fps.",
     )
 
+    parser.add_argument(
+        "--initial-knee-flexion-fraction",
+        type=float,
+        default=0.1,
+        help=(
+            "Before first retarget, set knee hinges from each joint's MuJoCo range: "
+            "q = lower + fraction * (upper - lower). Fraction is in [0, 1] along the "
+            "allowed bend span (0 = lower limit / typically extended). Default 0.1 = slight "
+            "bend; use 0 to disable. Values below 0 are clamped to 0(no effect); values above 1 are "
+            "clamped to 1 (full span toward the upper limit)."
+        ),
+    )
+
     args = parser.parse_args()
+
+    _ikf = args.initial_knee_flexion_fraction
+    if _ikf < 0.0 or _ikf > 1.0:
+        clamped = 0.0 if _ikf < 0.0 else 1.0
+        edge = "below 0" if _ikf < 0.0 else "above 1"
+        print(
+            "[Config] --initial-knee-flexion-fraction must be in [0, 1]; "
+            f"got {_ikf} ({edge}), using {clamped}."
+        )
+        args.initial_knee_flexion_fraction = clamped
+
     selected_robot_adapter = ROBOT_ADAPTERS[args.robot]
 
     bvh_file_path = args.bvh_file
@@ -1204,7 +1100,11 @@ if __name__ == "__main__":
     print(f"[Config] BVH unit arg: {args.bvh_unit}")
     print(f"[Config] Resolved BVH unit: {bvh_unit_plan.unit_name}")
     print(f"[Config] Position scale to meter: {bvh_unit_plan.position_scale_to_meter}")
-    
+    print(
+        f"[Config] Initial knee flexion fraction (of each knee joint range): "
+        f"{args.initial_knee_flexion_fraction}"
+    )
+
     # Load motion data through robot-specific adapter entrypoint.
     mocap_data, actual_human_height = selected_robot_adapter.load_motion_data(
         bvh_format=args.format,
@@ -1224,6 +1124,11 @@ if __name__ == "__main__":
         bvh_format=args.format,
         ik_config_file=pathlib.Path(json_file_path),
         actual_human_height=actual_human_height,
+    )
+    expected_qpos_dim = int(preprocessor.model.nq)
+    apply_initial_knee_flexion_bvh_script(
+        preprocessor,
+        args.initial_knee_flexion_fraction,
     )
 
     playback_controller = PlaybackController()
@@ -1247,63 +1152,82 @@ if __name__ == "__main__":
     should_finish = False
     last_qpos = None
     last_scaled_human_data = None
+    # True if the user stopped via Ctrl+C (terminal sentinel or KeyboardInterrupt elsewhere).
+    stopped_by_interrupt = False
 
     with TerminalKeyReader() as terminal_key_reader:
         while True:
-            terminal_action = terminal_key_reader.read_action_nonblocking()
-            if terminal_action is not None:
-                playback_controller.handle_action(terminal_action, source="terminal")
+            try:
+                terminal_action = terminal_key_reader.read_action_nonblocking()
+                if terminal_action == TERMINAL_INTERRUPT_ACTION:
+                    tqdm.write("\n[Control] Stopping (Ctrl+C).")
+                    stopped_by_interrupt = True
+                    should_finish = True
+                elif terminal_action is not None:
+                    playback_controller.handle_action(terminal_action, source="terminal")
 
-            if playback_controller.stop_requested:
-                should_finish = True
-
-            should_advance = (
-                (not playback_controller.is_paused) or playback_controller.consume_step_once()
-            )
-
-            if should_advance and not should_finish:
-                # FPS measurement for frame advancement path.
-                fps_counter += 1
-                current_time = time.time()
-                if current_time - fps_start_time >= fps_display_interval:
-                    actual_fps = fps_counter / (current_time - fps_start_time)
-                    print(f"Actual rendering FPS: {actual_fps:.2f}")
-                    fps_counter = 0
-                    fps_start_time = current_time
-
-                # Update task targets.
-                source_frame_index = int(frame_indices[frame_cursor])
-                qpos = preprocessor.retarget(mocap_data[source_frame_index], offset_to_ground=False)
-                selected_robot_adapter.validate_qpos(qpos)
-                qpos = selected_robot_adapter.postprocess_qpos(qpos)
-                scaled_human_data = preprocessor.scaled_human_data
-
-                qpos_list.append(qpos)
-                last_qpos = qpos
-                last_scaled_human_data = scaled_human_data
-                pbar.update(1)
-
-                frame_cursor += 1
-                if frame_cursor >= len(frame_indices):
+                if playback_controller.stop_requested:
                     should_finish = True
 
-            # Keep viewer responsive even when paused.
-            if last_qpos is not None:
-                robot_motion_viewer.step(
-                    root_pos=last_qpos[:3] + np.array([0.0, 0.0, 0.0]),
-                    root_rot=last_qpos[3:7],
-                    dof_pos=last_qpos[7:],
-                    human_motion_data=last_scaled_human_data,
-                    rate_limit=(fps_plan.viewer_rate_limit_enabled or playback_controller.is_paused),
-                    follow_camera=True,
+                should_advance = (
+                    (not playback_controller.is_paused) or playback_controller.consume_step_once()
                 )
 
-            if should_finish:
+                if should_advance and not should_finish:
+                    # FPS measurement for frame advancement path.
+                    fps_counter += 1
+                    current_time = time.time()
+                    if current_time - fps_start_time >= fps_display_interval:
+                        actual_fps = fps_counter / (current_time - fps_start_time)
+                        print(f"Actual rendering FPS: {actual_fps:.2f}")
+                        fps_counter = 0
+                        fps_start_time = current_time
+
+                    # Update task targets.
+                    source_frame_index = int(frame_indices[frame_cursor])
+                    qpos = preprocessor.retarget(
+                        mocap_data[source_frame_index], offset_to_ground=False
+                    )
+                    selected_robot_adapter.validate_qpos(qpos, expected_qpos_dim)
+                    qpos = selected_robot_adapter.postprocess_qpos(qpos)
+                    scaled_human_data = preprocessor.scaled_human_data
+
+                    qpos_list.append(qpos)
+                    last_qpos = qpos
+                    last_scaled_human_data = scaled_human_data
+                    pbar.update(1)
+
+                    frame_cursor += 1
+                    if frame_cursor >= len(frame_indices):
+                        should_finish = True
+
+                # Keep viewer responsive even when paused.
+                if last_qpos is not None:
+                    robot_motion_viewer.step(
+                        root_pos=last_qpos[:3] + np.array([0.0, 0.0, 0.0]),
+                        root_rot=last_qpos[3:7],
+                        dof_pos=last_qpos[7:],
+                        human_motion_data=last_scaled_human_data,
+                        rate_limit=(
+                            fps_plan.viewer_rate_limit_enabled or playback_controller.is_paused
+                        ),
+                        follow_camera=True,
+                    )
+
+                if should_finish:
+                    break
+            except KeyboardInterrupt:
+                # e.g. Ctrl+C during retarget() or viewer.step(); same exit path as TERMINAL_*.
+                tqdm.write("\n[Control] Stopping (Ctrl+C).")
+                stopped_by_interrupt = True
                 break
 
     if len(qpos_list) == 0:
         pbar.close()
         robot_motion_viewer.close()
+        if stopped_by_interrupt:
+            tqdm.write("[Done] Stopped by user; no PKL file generated.")
+            raise SystemExit(130)
         tqdm.write("[Done] No frames processed; no PKL file generated.")
         raise RuntimeError("No frame was processed before stopping.")
 
