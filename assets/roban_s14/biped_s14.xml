@@ -224,11 +224,6 @@
               <inertial pos="-0.000506329 -0.000850231 -0.10101" quat="1 0.000562672 -0.000316367 -4.25256e-05" mass="0.172694" diaginertia="0.000962811 0.000915927 0.000122039"/>
               <joint name="zarm_l4_joint" pos="0 0 0" axis="0 1 0" range="-2.26893 0" actuatorfrcrange="-12 12" damping="0.2" frictionloss="0.1"/>
               <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="l_forearm"/>
-              <body name="left_wrist_link" pos="0 0 -0.2">
-                <inertial pos="0 0 0" quat="1 0 0 0" mass="0.05" diaginertia="0.0001 0.0001 0.0001" />
-                <joint name="left_wrist_joint" pos="0 0 0" axis="0 0 1" range="-1.5708 1.5708" actuatorfrcrange="-12 12"/>
-                <site size="0.02" pos="0 0 0" rgba="1 1 1 0"/>
-              </body>
             </body>
           </body>
         </body>
@@ -249,11 +244,6 @@
               <inertial pos="-0.000506329 -0.000850231 -0.10101" quat="1 0.000562672 -0.000316367 -4.25256e-05" mass="0.172694" diaginertia="0.000962811 0.000915927 0.000122039"/>
               <joint name="zarm_r4_joint" pos="0 0 0" axis="0 1 0" range="-2.26893 0" actuatorfrcrange="-12 12" damping="0.2" frictionloss="0.1"/>
               <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="1 1 1 1" mesh="r_forearm"/>
-              <body name="right_wrist_link" pos="0 0 -0.2">
-                <inertial pos="0 0 0" quat="1 0 0 0" mass="0.05" diaginertia="0.0001 0.0001 0.0001" />
-                <joint name="right_wrist_joint" pos="0 0 0" axis="0 0 1" range="-1.5708 1.5708" actuatorfrcrange="-12 12"/>
-                <site size="0.02" pos="0 0 0" rgba="1 1 1 0"/>
-              </body>
             </body>
           </body>
         </body>
@@ -288,12 +278,10 @@
     <motor gear="1" joint="zarm_l2_joint" name="zarm_l2_joint_motor" ctrllimited="true" ctrlrange="-12 12" />
     <motor gear="1" joint="zarm_l3_joint" name="zarm_l3_joint_motor" ctrllimited="true" ctrlrange="-12 12" />
     <motor gear="1" joint="zarm_l4_joint" name="zarm_l4_joint_motor" ctrllimited="true" ctrlrange="-12 12" />
-    <motor gear="1" joint="left_wrist_joint" name="left_wrist_joint_motor" ctrllimited="true" ctrlrange="-12 12" />
     <motor gear="1" joint="zarm_r1_joint" name="zarm_r1_joint_motor" ctrllimited="true" ctrlrange="-12 12" />
     <motor gear="1" joint="zarm_r2_joint" name="zarm_r2_joint_motor" ctrllimited="true" ctrlrange="-12 12" />
     <motor gear="1" joint="zarm_r3_joint" name="zarm_r3_joint_motor" ctrllimited="true" ctrlrange="-12 12" />
     <motor gear="1" joint="zarm_r4_joint" name="zarm_r4_joint_motor" ctrllimited="true" ctrlrange="-12 12" />
-    <motor gear="1" joint="right_wrist_joint" name="right_wrist_joint_motor" ctrllimited="true" ctrlrange="-12 12" />
   </actuator>
   <sensor>
     <accelerometer name="BodyAcc" site="imu"/>

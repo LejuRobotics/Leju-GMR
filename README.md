@@ -244,34 +244,63 @@ python scripts/vis_robot_motion_dataset.py \
 --robot <robot_name> \
 --robot_motion_folder <path_to_save_robot_data_folder>
 ```
-## 7、数据转换（bvh_to_csv）
-框架提供数据转换功能，可以选择将bvh数据格式转换为csv格式。
+## 7、数据转换（pkl_to_csv）
+框架提供数据转换功能，可将机器人运动 `.pkl` 转换为 `.csv`，并按机器人型号进行严格 DoF 校验与重排（`Leg + Waist + Arm`）。
+
 - 基本用法
 
 ```bash
-python scripts/batch_gmr_pkl_to_csv.py --folder <包含pkl文件的文件夹路径>
+# 单文件转换
+python scripts/pkl_to_csv.py \
+--robot <robot_name> \
+--pkl_file <path_to_file.pkl>
+
+# 文件夹批量转换
+python scripts/pkl_to_csv.py \
+--robot <robot_name> \
+--folder <path_to_pkl_folder>
 ```
 
--  参数说明
-  `--folder` (必需): 包含pkl文件的文件夹路径
-  - 脚本会扫描该文件夹下所有`.pkl`文件
-  - CSV文件将保存在**该文件夹下的`csv`子文件夹**中
+- 参数说明
+  - `--robot`（必需）：机器人型号。当前支持 `roban_s14`、`roban_s17`、`kuavo_s52`、`kuavo_s54`。
+  - `--pkl_file` / `--folder`（二选一，必需）：
+    - `--pkl_file`：转换单个 `.pkl` 文件；
+    - `--folder`：扫描目录下所有 `.pkl` 文件并批量转换。
+  - `--output`（可选）：
+    - 单文件模式：可传目标 `.csv` 文件路径，或输出目录；
+    - 批量模式：作为输出目录使用；
+    - 不传时默认输出到输入同级 `csv/` 子目录。
+  - `--max_frames`（可选）：限制导出最大帧数（从第 0 帧开始）。
+
+- 输出格式
+  - 每行数据格式为：`[root_pos(x,y,z), root_rot(x,y,z,w), dof_pos(...)]`。
+  - 其中 `dof_pos` 会按机器人配置强制输出为 `Leg -> Waist -> Arm` 顺序。
 
 - 使用示例
 
 ```bash
-# 示例1: 转换output文件夹中的所有pkl文件
-python transfer/batch_gmr_pkl_to_csv.py --folder GMR/output
+# 示例1：转换单个 pkl 文件
+python scripts/pkl_to_csv.py \
+--robot roban_s14 \
+--pkl_file output/roban_s14/pkl/0211_re_005_Skeleton_50fps.pkl
 
-# 示例2: 转换指定文件夹中的pkl文件
-python transfer/batch_gmr_pkl_to_csv.py --folder /path/to/pkl/files
+# 示例2：批量转换目录中的 pkl 文件
+python scripts/pkl_to_csv.py \
+--robot kuavo_s54 \
+--folder output/kuavo_s54/pkl
+
+# 示例3：指定输出目录并限制帧数
+python scripts/pkl_to_csv.py \
+--robot roban_s17 \
+--folder output/roban_s17/pkl \
+--output output/roban_s17/pkl/csv \
+--max_frames 2000
 ```
 ## 8、适配目录(详见`general_motion_retargeting/params.py`)
 
 | Assigned ID | Robot/Data Format | Robot DoF | SMPLX ([AMASS](https://amass.is.tue.mpg.de/), [OMOMO](https://github.com/lijiaman/omomo_release)) | BVH [LAFAN1](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)| FBX ([OptiTrack](https://www.optitrack.com/)) |  BVH (Leju) | PICO ([XRoboToolkit](https://github.com/XR-Robotics/XRoboToolkit-PC-Service)) | More formats coming soon | 
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Roban S14 `roban_s14` | Leg (2\*6) + Waist (1) + Arm (2\*5) = 23 | TBD | ✅ | TBD | ✅ | TBD |
-| 2 | Roban S17 `roban_s17` | Leg (2\*6) + Waist (1) + Arm (2\*5) = 23 | TBD | TBD | TBD | ✅ | TBD |
-| 3 | Kuavo S45 `kuavo_s45` | Leg (2\*6) + Arm (2\*7) = 26 | ✅ | TBD | TBD | TBD | TBD |
-| 4 | Kuavo S52 `kuavo_s52` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | ✅ | TBD |  ✅ | TBD |
-| 5 | Kuavo S54 `kuavo_s54` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | TBD | TBD |  ✅ | TBD |
+| 1 | Roban S14 `roban_s14` | Leg (2\*6) + Waist (1) + Arm (2\*4) = 21 | TBD | TBD | TBD | ✅ | TBD |
+| 2 | Roban S17 `roban_s17` | Leg (2\*6) + Waist (1) + Arm (2\*4) = 21 | TBD | TBD | TBD | ✅ | TBD |
+| 3 | Kuavo S52 `kuavo_s52` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | TBD | TBD |  ✅ | TBD |
+| 4 | Kuavo S54 `kuavo_s54` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | TBD | TBD |  ✅ | TBD |

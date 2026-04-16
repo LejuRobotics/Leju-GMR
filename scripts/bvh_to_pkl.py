@@ -79,6 +79,138 @@ class BvhUnitPlan:
     position_scale_to_meter: float
 
 
+@dataclass(frozen=True)
+class RobotJointLayout:
+    """Per-robot joint layout for PKL dof_pos serialization."""
+
+    robot: str
+    leg_indices: tuple[int, ...]
+    waist_indices: tuple[int, ...]
+    arm_indices: tuple[int, ...]
+    expected_leg_dof: int
+    expected_waist_dof: int
+    expected_arm_dof: int
+
+    @property
+    def expected_total_dof(self) -> int:
+        return self.expected_leg_dof + self.expected_waist_dof + self.expected_arm_dof
+
+    @property
+    def ordered_indices(self) -> tuple[int, ...]:
+        # Required order by README definition.
+        return self.leg_indices + self.waist_indices + self.arm_indices
+
+
+@dataclass(frozen=True)
+class RobotLayoutSpec:
+    """Declarative spec for building RobotJointLayout safely."""
+
+    robot: str
+    leg_dof: int
+    waist_dof: int
+    arm_dof: int
+    leg_indices: Optional[tuple[int, ...]] = None
+    waist_indices: Optional[tuple[int, ...]] = None
+    arm_indices: Optional[tuple[int, ...]] = None
+
+
+def _build_default_contiguous_indices(
+    leg_dof: int,
+    waist_dof: int,
+    arm_dof: int,
+) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
+    start = 0
+    leg = tuple(range(start, start + leg_dof))
+    start += leg_dof
+    waist = tuple(range(start, start + waist_dof))
+    start += waist_dof
+    arm = tuple(range(start, start + arm_dof))
+    return leg, waist, arm
+
+
+def make_robot_joint_layout(spec: RobotLayoutSpec) -> RobotJointLayout:
+    """Build one robot layout with optional custom index overrides."""
+    default_leg, default_waist, default_arm = _build_default_contiguous_indices(
+        leg_dof=spec.leg_dof,
+        waist_dof=spec.waist_dof,
+        arm_dof=spec.arm_dof,
+    )
+    leg_indices = spec.leg_indices or default_leg
+    waist_indices = spec.waist_indices or default_waist
+    arm_indices = spec.arm_indices or default_arm
+
+    return RobotJointLayout(
+        robot=spec.robot,
+        leg_indices=leg_indices,
+        waist_indices=waist_indices,
+        arm_indices=arm_indices,
+        expected_leg_dof=spec.leg_dof,
+        expected_waist_dof=spec.waist_dof,
+        expected_arm_dof=spec.arm_dof,
+    )
+
+
+ROBOT_LAYOUT_SPECS: Dict[str, RobotLayoutSpec] = {
+    # Keep each robot independent for future divergence.
+    "roban_s14": RobotLayoutSpec(robot="roban_s14", leg_dof=12, waist_dof=1, arm_dof=8),
+    "roban_s17": RobotLayoutSpec(robot="roban_s17", leg_dof=12, waist_dof=1, arm_dof=8),
+    "kuavo_s52": RobotLayoutSpec(robot="kuavo_s52", leg_dof=12, waist_dof=1, arm_dof=14),
+    "kuavo_s54": RobotLayoutSpec(robot="kuavo_s54", leg_dof=12, waist_dof=1, arm_dof=14),
+}
+
+ROBOT_JOINT_LAYOUTS: Dict[str, RobotJointLayout] = {
+    robot: make_robot_joint_layout(spec)
+    for robot, spec in ROBOT_LAYOUT_SPECS.items()
+}
+
+
+def validate_robot_joint_layout(layout: RobotJointLayout) -> None:
+    """Validate static layout definition at startup."""
+    if len(layout.leg_indices) != layout.expected_leg_dof:
+        raise ValueError(
+            f"[{layout.robot}] layout error: leg indices must be "
+            f"{layout.expected_leg_dof}, got {len(layout.leg_indices)}."
+        )
+    if len(layout.waist_indices) != layout.expected_waist_dof:
+        raise ValueError(
+            f"[{layout.robot}] layout error: waist indices must be "
+            f"{layout.expected_waist_dof}, got {len(layout.waist_indices)}."
+        )
+    if len(layout.arm_indices) != layout.expected_arm_dof:
+        raise ValueError(
+            f"[{layout.robot}] layout error: arm indices must be "
+            f"{layout.expected_arm_dof}, got {len(layout.arm_indices)}."
+        )
+
+    all_indices = layout.ordered_indices
+    if len(set(all_indices)) != len(all_indices):
+        raise ValueError(f"[{layout.robot}] layout error: duplicate joint indices found.")
+    if min(all_indices) < 0:
+        raise ValueError(f"[{layout.robot}] layout error: negative joint index found.")
+
+
+def project_structured_dof_from_qpos(
+    qpos: np.ndarray,
+    layout: RobotJointLayout,
+) -> np.ndarray:
+    """Project qpos[7:] to strict Leg + Waist + Arm ordering."""
+    dof_raw = np.asarray(qpos[7:], dtype=np.float64)
+    max_index = max(layout.ordered_indices)
+    if max_index >= int(dof_raw.shape[0]):
+        raise ValueError(
+            f"[{layout.robot}] dof projection error: max layout index={max_index}, "
+            f"but dof_raw dim={dof_raw.shape[0]}."
+        )
+
+    dof_structured = dof_raw[list(layout.ordered_indices)]
+    if int(dof_structured.shape[0]) != int(layout.expected_total_dof):
+        raise ValueError(
+            f"[{layout.robot}] projected dof mismatch: got {dof_structured.shape[0]}, "
+            f"expected {layout.expected_total_dof}."
+        )
+    return dof_structured
+
+
 class PlaybackController:
     """Keyboard-driven playback state for pause/resume/step/quit."""
 
@@ -1050,6 +1182,8 @@ if __name__ == "__main__":
         args.initial_knee_flexion_fraction = clamped
 
     selected_robot_adapter = ROBOT_ADAPTERS[args.robot]
+    selected_robot_joint_layout = ROBOT_JOINT_LAYOUTS[args.robot]
+    validate_robot_joint_layout(selected_robot_joint_layout)
 
     bvh_file_path = args.bvh_file
     motion_frames_for_unit_estimation = probe_motion_frames_for_unit_estimation(
@@ -1101,6 +1235,13 @@ if __name__ == "__main__":
     print(f"[Config] Resolved BVH unit: {bvh_unit_plan.unit_name}")
     print(f"[Config] Position scale to meter: {bvh_unit_plan.position_scale_to_meter}")
     print(
+        f"[Config] Output dof layout ({args.robot}): "
+        f"Leg {selected_robot_joint_layout.expected_leg_dof} + "
+        f"Waist {selected_robot_joint_layout.expected_waist_dof} + "
+        f"Arm {selected_robot_joint_layout.expected_arm_dof} = "
+        f"{selected_robot_joint_layout.expected_total_dof}"
+    )
+    print(
         f"[Config] Initial knee flexion fraction (of each knee joint range): "
         f"{args.initial_knee_flexion_fraction}"
     )
@@ -1118,6 +1259,7 @@ if __name__ == "__main__":
     )
 
     qpos_list = []
+    structured_dof_list = []
 
     # Build robot-specific preprocessor through adapter.
     preprocessor = selected_robot_adapter.build_preprocessor(
@@ -1193,6 +1335,11 @@ if __name__ == "__main__":
                     scaled_human_data = preprocessor.scaled_human_data
 
                     qpos_list.append(qpos)
+                    structured_dof = project_structured_dof_from_qpos(
+                        qpos=qpos,
+                        layout=selected_robot_joint_layout,
+                    )
+                    structured_dof_list.append(structured_dof)
                     last_qpos = qpos
                     last_scaled_human_data = scaled_human_data
                     pbar.update(1)
@@ -1234,7 +1381,11 @@ if __name__ == "__main__":
     # Dump processed sequence to pkl file.
     root_pos = np.array([q[:3] for q in qpos_list])
     root_rot = np.array([q[3:7][[1,2,3,0]] for q in qpos_list])
-    dof_pos = np.array([q[7:] for q in qpos_list])
+    if len(structured_dof_list) != len(qpos_list):
+        raise RuntimeError(
+            "Internal error: structured_dof_list length does not match qpos_list length."
+        )
+    dof_pos = np.asarray(structured_dof_list, dtype=np.float64)
     local_body_pos = None
     body_names = None
     motion_data = {
@@ -1242,6 +1393,12 @@ if __name__ == "__main__":
         "root_pos": root_pos,
         "root_rot": root_rot,
         "dof_pos": dof_pos,
+        "robot": args.robot,
+        "dof_layout": {
+            "leg_indices": list(selected_robot_joint_layout.leg_indices),
+            "waist_indices": list(selected_robot_joint_layout.waist_indices),
+            "arm_indices": list(selected_robot_joint_layout.arm_indices),
+        },
         "local_body_pos": local_body_pos,
         "link_body_list": body_names,
     }
