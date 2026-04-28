@@ -296,10 +296,10 @@ def main():
     # 上传参数
     parser.add_argument('-c', '--capture', dest='capture_type', default="0", help='Capture Type, multiple values separated by commas, such as "0,2,3". 0:Whole body (default), 1: Half body, 2: Hand catching, 3: Face catching, 5: Automatic judgment (full body/half body)')
     parser.add_argument('-b', '--bone', dest='bone_type', default= 15, help='Bone Type, refer to the skeleton type table')
-    parser.add_argument('-p', '--pose', dest='pose_type', default= 1, help='First frame pose: 1 (TPose), 2 (APose), 3 (original pose)(default: 1)')
+    parser.add_argument('-p', '--pose', dest='pose_type', default= 3, help='First frame pose: 1 (TPose), 2 (APose), 3 (original pose)(default: 3)')
     parser.add_argument('-r', '--frameRate', dest='frame_rate', default= 30, help='Output frame rate (Billing-related): 24/30, 60, 120')
     parser.add_argument('-s', '--standPose', dest='stand_pose', action="store_true", default=False, help='Move in place: (default: False)')
-    # parser.add_argument('--physicType', dest='physic_type', default="1", help='Physical optimization type 2(2.0) (default: 2 open)')
+    # parser.add_argument('--physicType', dest='physic_type', default="2", help='Physical optimization type 2(2.0) (default: 2 open)')
     parser.add_argument('--physicTimes', dest='physic_times', default= 6, help='Only valid when physicalType=2, optional 1-6 (6 represents 10 times) (default: 6)')
     parser.add_argument('--piercing', dest='piercing', default= "0", help='Anti-mold protection, optional 0, 1 (default 0 is off)')
     

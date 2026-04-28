@@ -11,7 +11,7 @@ python scripts/qmai_video_to_bvh.py -f "*/video.mp4" -k "your key" -o "output di
  -k | --key | str |: 企业上传凭证，可在用户详情页查看（必填） \
  -c | --capture | str |: 捕捉类型 (`capturetype`) (默认全身`0`) \
  -b | --bone | int |： 骨骼类型 (`bonetype`)（默认`15`(即bvh)，其他类型看骨骼类型详情表） \
- -p | --pose | int |： 第一帧姿态类型 (`posetype`) （默认TPose`1`） \
+ -p | --pose | int |： 第一帧姿态类型 (`posetype`) （默认原Pose`3`） \
  -r | --frameRate | int |: 输出帧率(计费相关): 24/30, 60, 120 (默认30帧，逗号分割代表不同价格) \
  -s | --standPose | bool |: 原地动作，默认关闭(开启后动作将在原地执行，可能对下肢还原后一定影响，不建议开启) \
  --physicType | int |: 物理优化类型：2:(2.0版) (默认开启) \
