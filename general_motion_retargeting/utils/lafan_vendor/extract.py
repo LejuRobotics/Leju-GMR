@@ -605,6 +605,127 @@ def qmai_read_bvh(filename, start=None, end=None, order=None):
         # 替换帧序列：插值过渡帧 + 原第2帧往后所有
         positions = np.concatenate([np.array(new_pos), positions[2:]], axis=0)
         rotations = np.concatenate([np.array(new_rot), rotations[2:]], axis=0)
+    
+    # 舞蹈结束后短暂停顿，归位到Apose，设置中间姿态Tpose
+    # 标准Tpose数据
+    Tpose = np.array([0.007400, 89.275000, 0.002500, -0.214910, 1.503074, 9.469098, 0.006216, -0.001953, -5.004647, 
+                      0.530173, 0.035118, -3.341617, 2.183114, -1.686839, -8.315980, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 
+                      0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, -0.680333, 24.375445, -15.314976, 
+                      0.000000, 0.000000, 10.274125, -1.009446, -21.184432, -4.451263, 0.000000, 0.000000, 0.000000, 
+                      0.793020, -26.408137, -13.640875, 0.000000, 0.000000, 8.716662, 1.740759, 15.642558, -4.208407, 
+                      0.000000, 0.000000, -0.000003 
+                      ])
+
+    # 获取手臂骨骼索引
+    right_arm_idx = [names.index(b) for b in ['RightShoulder']]
+    left_arm_idx  = [names.index(b) for b in ['LeftShoulder']]
+
+    # 当前末尾帧
+    end_pos = positions[-1, 0, :].copy()   # Hips
+    end_rot = rotations[-1].copy()         # 全部骨骼旋转
+
+    # 保持地面高度
+    Tpose_pos = Tpose[0:3].copy()
+    Tpose_rot = Tpose[3:].reshape(len(parents),3)
+    Apose_pos = Apose[0:3].copy()
+    Apose_rot = Apose[3:].reshape(len(parents),3)
+
+    # ---------------- 停顿帧 ----------------
+    pause_frames = 10
+    pause_pos = np.repeat(positions[-1][np.newaxis,:,:], pause_frames, axis=0)
+    pause_rot = np.repeat(rotations[-1][np.newaxis,:,:], pause_frames, axis=0)
+    positions = np.concatenate([positions, pause_pos], axis=0)
+    rotations = np.concatenate([rotations, pause_rot], axis=0)
+
+    # ---------------- 第一段：末尾 -> Tpose ----------------
+    diff_pos = np.abs(end_pos - Tpose_pos)
+    diff_rot = np.abs(end_rot - Tpose_rot)
+    frames1 = max(int(max(np.max(diff_pos)/3.0, np.max(diff_rot)/6.0)*2),30)
+    print(f"动作最后一帧到T-Pose间插入 {frames1} 帧平滑过渡")
+
+    alphas1 = np.linspace(0,1,frames1+2)
+    new_pos1,new_rot1 = [],[]
+
+    for a in alphas1:
+        ipos = positions[-1].copy()
+        ipos[0,0] = (1-a)*end_pos[0] + a*Tpose_pos[0]
+        ipos[0,1] = (1-a)*end_pos[1] + a*Tpose_pos[1]
+        ipos[0,2] = (1-a)*end_pos[2] + a*Tpose_pos[2]
+        new_pos1.append(ipos)
+
+        irot = np.zeros_like(end_rot)
+        for j in range(end_rot.shape[0]):
+            q0 = R.from_euler(order,end_rot[j],degrees=True).as_quat()
+            q1 = R.from_euler(order,Tpose_rot[j],degrees=True).as_quat()
+            dot = np.dot(q0,q1)
+            # 手臂旋转限制 ±90°/帧
+            if j in right_arm_idx + left_arm_idx:
+                if dot<0: q1=-q1
+                delta = R.from_quat(q1).as_rotvec() - R.from_quat(q0).as_rotvec()
+                delta = np.clip(delta,-np.pi*2/4,np.pi*2/4)
+                q1 = R.from_rotvec(R.from_quat(q0).as_rotvec() + delta).as_quat()
+            else:
+                if dot < 0:
+                    q1 = -q1
+            # SLERP
+            if dot>0.9995:
+                q = q0*(1-a)+q1*a
+            else:
+                theta,sin_theta=np.arccos(dot),np.sin(np.arccos(dot))
+                q = (np.sin((1-a)*theta)/sin_theta)*q0 + (np.sin(a*theta)/sin_theta)*q1
+            irot[j] = R.from_quat(q).as_euler(order,degrees=True)
+        new_rot1.append(irot)
+
+    positions = np.concatenate([positions,np.array(new_pos1)],axis=0)
+    rotations = np.concatenate([rotations,np.array(new_rot1)],axis=0)
+
+    # ---------------- 第二段：Tpose -> Apose ----------------
+    start_pos = positions[-1,0,:].copy()
+    start_rot = rotations[-1].copy()
+    frames2 = 40
+    alphas2 = np.linspace(0,1,frames2+2)
+    new_pos2,new_rot2=[],[]
+
+    for a in alphas2:
+        ipos = positions[-1].copy()
+        ipos[0,0] = (1-a)*start_pos[0]+a*Apose_pos[0]
+        ipos[0,1] = (1-a)*start_pos[1]+a*Apose_pos[1]
+        ipos[0,2] = (1-a)*start_pos[2]+a*Apose_pos[2]
+        new_pos2.append(ipos)
+
+        irot = np.zeros_like(start_rot)
+        for j in range(start_rot.shape[0]):
+            q0 = R.from_euler(order,start_rot[j],degrees=True).as_quat()
+            q1 = R.from_euler(order,Apose_rot[j],degrees=True).as_quat()
+            dot = np.dot(q0,q1)
+            if dot < 0:
+                q1 = -q1
+            if dot>0.9995:
+                q=q0*(1-a)+q1*a
+            else:
+                theta,sin_theta=np.arccos(dot),np.sin(np.arccos(dot))
+                q=(np.sin((1-a)*theta)/sin_theta)*q0+(np.sin(a*theta)/sin_theta)*q1
+            irot[j]=R.from_quat(q).as_euler(order,degrees=True)
+        new_rot2.append(irot)
+
+    positions = np.concatenate([positions[:-1],np.array(new_pos2)],axis=0)
+    rotations = np.concatenate([rotations[:-1],np.array(new_rot2)],axis=0)
 
     #将qmai数据集转变为lafan格式
     names, offsets, parents, rotations, positions = qmai_to_lafan(names, offsets, parents, rotations, positions)
