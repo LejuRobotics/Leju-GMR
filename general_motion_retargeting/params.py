@@ -16,6 +16,12 @@ IK_CONFIG_DICT = {
     # offline data
     "smplx":{
         "kuavo_s45": IK_CONFIG_ROOT / "smplx_to_kuavo.json",
+        "kuavo_s54": IK_CONFIG_ROOT / "smplx_to_kuavos54.json",
+        "roban_s17": IK_CONFIG_ROOT / "smplx_to_s17.json",
+    },
+    "smpl":{
+        "kuavo_s54": IK_CONFIG_ROOT / "smpl_to_kuavos54.json",
+        "roban_s17": IK_CONFIG_ROOT / "smplx_to_s17.json",
     },
     "bvh_lafan1":{
         "roban_s14": IK_CONFIG_ROOT / "bvh_lafan1_to_robans14.json",

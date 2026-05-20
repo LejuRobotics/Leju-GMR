@@ -7,9 +7,109 @@ from scipy.interpolate import interp1d
 
 import general_motion_retargeting.utils.lafan_vendor.utils as utils
 
+SMPL_JOINT_NAMES = [
+    'pelvis', 'left_hip', 'right_hip', 'spine1',
+    'left_knee', 'right_knee', 'spine2',
+    'left_ankle', 'right_ankle', 'spine3',
+    'left_foot', 'right_foot', 'neck',
+    'left_collar', 'right_collar', 'head',
+    'left_shoulder', 'right_shoulder',
+    'left_elbow', 'right_elbow',
+    'left_wrist', 'right_wrist',
+    'left_hand', 'right_hand',
+]
+
+SMPL_PARENTS = [-1, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 12, 13, 14, 16, 17, 18, 19, 20, 21]
+
+
 def load_smpl_file(smpl_file):
     smpl_data = np.load(smpl_file, allow_pickle=True)
     return smpl_data
+
+
+def load_smpl_file_full(smpl_file, smplx_body_model_path):
+    """Load SMPL .npz file and process through SMPL-X body model.
+
+    Converts SMPL data (24 joints, 72 pose params) to SMPL-X format internally,
+    runs through the SMPL-X body model, then remaps joint names back to SMPL convention.
+    """
+    smpl_data = dict(np.load(smpl_file, allow_pickle=True))
+
+    # Pad betas from 10 to 16 for SMPL-X compatibility
+    if 'betas' in smpl_data:
+        betas = smpl_data['betas']
+        if betas.shape == (10,):
+            smpl_data['betas'] = np.concatenate([betas, np.zeros(6, dtype=betas.dtype)])
+        elif len(betas.shape) > 1 and betas.shape[-1] == 10:
+            smpl_data['betas'] = np.concatenate([betas, np.zeros((*betas.shape[:-1], 6), dtype=betas.dtype)], axis=-1)
+
+    # Handle mocap_framerate variations
+    if 'mocap_framerate' in smpl_data and 'mocap_frame_rate' not in smpl_data:
+        smpl_data['mocap_frame_rate'] = smpl_data.pop('mocap_framerate')
+
+    # Extract root_orient and pose_body from SMPL poses
+    if 'poses' in smpl_data and 'root_orient' not in smpl_data:
+        poses = smpl_data['poses']
+        if poses.shape[1] > 72:
+            poses = poses[:, :72]
+        smpl_data['root_orient'] = poses[:, :3]
+        smpl_data['pose_body'] = poses[:, 3:66]  # 21 joints x 3
+
+    body_model = smplx.create(
+        smplx_body_model_path, "smplx",
+        gender=str(smpl_data.get("gender", "neutral")),
+        use_pca=False,
+    )
+
+    num_frames = smpl_data["pose_body"].shape[0]
+    smplx_output = body_model(
+        betas=torch.tensor(smpl_data["betas"]).float().view(1, -1),
+        global_orient=torch.tensor(smpl_data["root_orient"]).float(),
+        body_pose=torch.tensor(smpl_data["pose_body"]).float(),
+        transl=torch.tensor(smpl_data["trans"]).float(),
+        left_hand_pose=torch.zeros(num_frames, 45).float(),
+        right_hand_pose=torch.zeros(num_frames, 45).float(),
+        jaw_pose=torch.zeros(num_frames, 3).float(),
+        leye_pose=torch.zeros(num_frames, 3).float(),
+        reye_pose=torch.zeros(num_frames, 3).float(),
+        return_full_pose=True,
+    )
+
+    if len(smpl_data["betas"].shape) == 1:
+        human_height = 1.66 + 0.1 * smpl_data["betas"][0]
+    else:
+        human_height = 1.66 + 0.1 * smpl_data["betas"][0, 0]
+
+    return smpl_data, body_model, smplx_output, human_height
+
+
+def get_smpl_data_offline(smpl_data, body_model, smplx_output, tgt_fps=30):
+    """Process SMPL data frames, returning dicts keyed by SMPL 24-joint names.
+
+    Uses SMPL-X body model output for joints 0-21 (shared with SMPL),
+    then synthesizes left_hand/right_hand from left_wrist/right_wrist.
+    """
+    smplx_frames, aligned_fps = get_smplx_data_offline_fast(
+        smpl_data, body_model, smplx_output, tgt_fps=tgt_fps,
+    )
+
+    smpl_frames = []
+    for frame in smplx_frames:
+        smpl_frame = {}
+        # Copy joints 0-21 (names are identical between SMPL and SMPL-X)
+        for name in SMPL_JOINT_NAMES[:22]:
+            if name in frame:
+                smpl_frame[name] = frame[name]
+        # Synthesize left_hand / right_hand from wrist data with a small forward offset
+        if 'left_wrist' in frame:
+            pos, quat = frame['left_wrist']
+            smpl_frame['left_hand'] = (pos, quat)
+        if 'right_wrist' in frame:
+            pos, quat = frame['right_wrist']
+            smpl_frame['right_hand'] = (pos, quat)
+        smpl_frames.append(smpl_frame)
+
+    return smpl_frames, aligned_fps
 
 def load_smplx_file(smplx_file, smplx_body_model_path):
     smplx_data = np.load(smplx_file, allow_pickle=True)

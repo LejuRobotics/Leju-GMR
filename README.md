@@ -177,16 +177,20 @@ python scripts/bvh_to_robot_dataset.py \
 
 
 
-### 6.2、从SMPL-X到机器人的运动重定向(目前仅适配kuavo_s45)
+### 6.2、从SMPL-X到机器人的运动重定向
 
-注意事项: 安装 SMPL-X 后，若使用 SMPL-X pkl 格式文件，需将 `smplx/body_models.py `文件中的文件扩展名 ext 从 npz 修改为 pkl。
+适用于 AMASS 的 SMPL-X 拟合数据（`*_stageii.npz`，`surface_model_type: smplx`），文件包含 `pose_body` / `pose_hand` / `pose_jaw` / `pose_eye` / `root_orient` / `betas` / `trans` 等字段。
+
+当前已支持的机器人型号：`roban_s17`、`kuavo_s45`、`kuavo_s54`。
+
+注意事项: 安装 SMPL-X 后，若使用 SMPL-X pkl 格式文件，需将 `smplx/body_models.py` 文件中的文件扩展名 ext 从 npz 修改为 pkl。
 
 (1)单段运动重定向
 
 ```bash
 python scripts/smplx_to_robot.py \
---smplx_file <path_to_smplx_data> \
---robot <path_to_robot_data> \
+--smplx_file <path_to_smplx_data.npz> \
+--robot <robot_name> \
 --save_path <path_to_save_robot_data.pkl> \
 --rate_limit
 ```
@@ -195,9 +199,9 @@ python scripts/smplx_to_robot.py \
 
 参数说明：
 
-* `--smplx_file`:指定要处理的 SMPLX文件路径，此参数为必填参数。
+* `--smplx_file`:指定要处理的 SMPL-X `.npz` 文件路径，此参数为必填参数。
 
-* `--robot`:指定运动重定向的目标机器人型号。
+* `--robot`:指定运动重定向的目标机器人型号，支持 `roban_s17` / `kuavo_s45` / `kuavo_s54`。
 
 * `--save_path`:指定运动重定向文件保存路径，默认不保存。
 
@@ -224,8 +228,28 @@ python scripts/smplx_to_robot_dataset.py \
 
 
 
+### 6.3、从SMPL到机器人的运动重定向
 
-### 6.3、可视化已保存的机器人动作
+适用于纯 SMPL 数据（`.npz` 的 `poses` 是 72 维，或 SMPL-H 的 156 维 — 内部会截断到前 22 个 body 关节，再通过 SMPL-X body model 计算 FK）。
+
+当前已支持：`roban_s17`、`kuavo_s54`。
+
+> 注意：如果你下载的 AMASS 文件是 `_stageii.npz` 后缀，通常已经是 SMPL-X 格式，应该用 `smplx_to_robot.py`；只有当 `npz` 的 `surface_model_type` 是 `smpl` 或 `smplh`（或者你拿到的是纯 SMPL 拟合的数据集如 HumanML3D），才走 SMPL 管道。
+
+```bash
+python scripts/smpl_to_robot.py \
+--smpl_file <path_to_smpl_data.npz> \
+--robot <robot_name> \
+--save_path <path_to_save_robot_data.pkl> \
+--rate_limit
+```
+
+参数语义同 `smplx_to_robot.py`。
+
+
+
+
+### 6.4、可视化已保存的机器人动作
 
 (1)可视化单个动作：
 
@@ -244,7 +268,48 @@ python scripts/vis_robot_motion_dataset.py \
 --robot <robot_name> \
 --robot_motion_folder <path_to_save_robot_data_folder>
 ```
+
+
+### 6.5、预览 SMPL-X `.npz` 原始动作（不经过重定向）
+
+调试重定向效果时，常需要先看一下"标准答案"（人体动作本身长什么样）。本框架通过 [aitviewer](https://github.com/eth-ait/aitviewer) 提供独立的 SMPL-X 数据预览工具：
+
+```bash
+# 默认查看 output/CMU/01/01_01_stageii.npz
+python scripts/visualize_smplx_npz.py
+
+# 指定文件 + 帧率
+python scripts/visualize_smplx_npz.py \
+    --npz output/CMU/05/05_01_stageii.npz \
+    --fps 60
+```
+
+依赖：
+
+```bash
+pip install aitviewer
+```
+
+参数说明：
+
+* `--npz`：AMASS `.npz` 文件路径
+* `--fps`：播放帧率（aitviewer 默认按这个速度回放）
+* `--body_models`：SMPL-X 模型根目录（默认 `assets/body_models/`）
+
+注意事项：
+
+* 脚本绕开了 aitviewer 自带的 `from_amass()`，因为它要求 `mocap_framerate` 键而新版 AMASS 用 `mocap_frame_rate`，会冲突。
+* aitviewer 默认 Y-up 坐标系，本脚本已通过 `z_up: True` 切换为 Z-up，与 MuJoCo 风格一致。
+* viewer 启动时如果遇到 `Cannot detect window with OpenGL support`，可能是 PyQt6 后端冲突，脚本已默认切到 `glfw` 后端。仍不行可尝试 `LIBGL_ALWAYS_SOFTWARE=1 python ...` 用软件渲染。
+
 ## 7、数据转换（pkl_to_csv）
+
+> CSV 文件本身不存帧率，要查可以读对应 PKL 的 `motion_data["fps"]` 字段：
+>
+> ```bash
+> python -c "import pickle; d=pickle.load(open('output/<robot>/cmu/85_01.pkl','rb')); print(d['fps'])"
+> ```
+
 框架提供数据转换功能，可将机器人运动 `.pkl` 转换为 `.csv`，并按机器人型号进行严格 DoF 校验与重排（`Leg + Waist + Arm`）。
 
 - 基本用法
@@ -298,9 +363,28 @@ python scripts/pkl_to_csv.py \
 ```
 ## 8、适配目录(详见`general_motion_retargeting/params.py`)
 
-| Assigned ID | Robot/Data Format | Robot DoF | SMPLX ([AMASS](https://amass.is.tue.mpg.de/), [OMOMO](https://github.com/lijiaman/omomo_release)) | BVH [LAFAN1](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)| FBX ([OptiTrack](https://www.optitrack.com/)) |  BVH (Leju) | PICO ([XRoboToolkit](https://github.com/XR-Robotics/XRoboToolkit-PC-Service)) | More formats coming soon | 
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Roban S14 `roban_s14` | Leg (2\*6) + Waist (1) + Arm (2\*4) = 21 | TBD | TBD | TBD | ✅ | TBD |
-| 2 | Roban S17 `roban_s17` | Leg (2\*6) + Waist (1) + Arm (2\*4) = 21 | TBD | TBD | TBD | ✅ | TBD |
-| 3 | Kuavo S52 `kuavo_s52` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | TBD | TBD |  ✅ | TBD |
-| 4 | Kuavo S54 `kuavo_s54` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | TBD | TBD |  ✅ | TBD |
+### 8.1 机器人 × 数据格式 支持矩阵
+
+| 机器人 | 标识 | DoF | qpos 维度 | SMPL-X | SMPL | BVH LAFAN1 | BVH Leju |
+|--------|------|-----|-----------|:------:|:----:|:----------:|:--------:|
+| Roban S17 | `roban_s17` | 21 (Leg×12 + Waist + Arm×8) | 28 | ✅ | ✅ | ✅ | ✅ |
+| Kuavo S45 | `kuavo_s45` | 26 (Leg×12 + Arm×14) | 33 | ✅ | TBD | TBD | TBD |
+| Kuavo S54 | `kuavo_s54` | 27 (Leg×12 + Waist + Arm×14) | 36 | ✅ | ✅ | ✅ | ✅ |
+
+
+### 8.2 数据格式 × 入口脚本
+
+| 源格式 | 入口脚本 | 说明 |
+|--------|---------|------|
+| SMPL-X (.npz) | `scripts/smplx_to_robot.py` | AMASS `_stageii.npz` |
+| SMPL / SMPL-H (.npz) | `scripts/smpl_to_robot.py` | 内部转 SMPL-X body model |
+| BVH | `scripts/bvh_to_pkl.py --format <leju\|lafan1\|qmai\|nokov>` | 支持四种 BVH 子格式 |
+
+### 8.3 辅助工具
+
+| 脚本 | 用途 |
+|------|------|
+| `scripts/visualize_smplx_npz.py` | 用 aitviewer 预览 SMPL-X 原始动作 |
+| `scripts/vis_robot_motion.py` | 可视化已保存的机器人 PKL |
+| `scripts/pkl_to_csv.py` | PKL → CSV，按机器人 DoF 严格校验 |
+| `scripts/batch_gmr_pkl_to_csv.py` | 批量 PKL → CSV（兼容 beyondmimic 格式） |
