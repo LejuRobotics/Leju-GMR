@@ -20,6 +20,7 @@ IK_CONFIG_DICT = {
         "roban_s17": IK_CONFIG_ROOT / "smplx_to_s17.json",
     },
     "smpl":{
+        "kuavo_s45": IK_CONFIG_ROOT / "smpl_to_kuavo.json",
         "kuavo_s54": IK_CONFIG_ROOT / "smpl_to_kuavos54.json",
         "roban_s17": IK_CONFIG_ROOT / "smplx_to_s17.json",
     },

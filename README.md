@@ -232,7 +232,7 @@ python scripts/smplx_to_robot_dataset.py \
 
 适用于纯 SMPL 数据（`.npz` 的 `poses` 是 72 维，或 SMPL-H 的 156 维 — 内部会截断到前 22 个 body 关节，再通过 SMPL-X body model 计算 FK）。
 
-当前已支持：`roban_s17`、`kuavo_s54`。
+当前已支持：`roban_s17`、`kuavo_s45`、`kuavo_s54`。
 
 > 注意：如果你下载的 AMASS 文件是 `_stageii.npz` 后缀，通常已经是 SMPL-X 格式，应该用 `smplx_to_robot.py`；只有当 `npz` 的 `surface_model_type` 是 `smpl` 或 `smplh`（或者你拿到的是纯 SMPL 拟合的数据集如 HumanML3D），才走 SMPL 管道。
 
@@ -368,7 +368,7 @@ python scripts/pkl_to_csv.py \
 | 机器人 | 标识 | DoF | qpos 维度 | SMPL-X | SMPL | BVH LAFAN1 | BVH Leju |
 |--------|------|-----|-----------|:------:|:----:|:----------:|:--------:|
 | Roban S17 | `roban_s17` | 21 (Leg×12 + Waist + Arm×8) | 28 | ✅ | ✅ | ✅ | ✅ |
-| Kuavo S45 | `kuavo_s45` | 26 (Leg×12 + Arm×14) | 33 | ✅ | TBD | TBD | TBD |
+| Kuavo S45 | `kuavo_s45` | 26 (Leg×12 + Arm×14) | 33 | ✅ | ✅ | TBD | TBD |
 | Kuavo S54 | `kuavo_s54` | 27 (Leg×12 + Waist + Arm×14) | 36 | ✅ | ✅ | ✅ | ✅ |
 
 

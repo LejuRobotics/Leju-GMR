@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--robot",
-        choices=["kuavo_s54"],
+        choices=["kuavo_s45", "kuavo_s54", "roban_s17"],
         default="kuavo_s54",
     )
 
