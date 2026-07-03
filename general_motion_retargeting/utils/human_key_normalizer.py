@@ -176,6 +176,21 @@ def ensure_required_human_keys_roban_s17(frame_data: HumanFrame) -> HumanFrame:
     return normalized_frame_data
 
 
+def ensure_required_human_keys_aelos(frame_data: HumanFrame) -> HumanFrame:
+    """
+    Ensure aelos-required canonical keys exist.
+
+    Required:
+    - LeftToeBase/RightToeBase
+    - LeftFootMod/RightFootMod
+    """
+    normalized_frame_data = normalize_human_frame_keys_common(frame_data)
+    normalized_frame_data = _ensure_toe_keys_from_toebase_common(normalized_frame_data)
+    normalized_frame_data = _ensure_toebase_keys_from_toe_common(normalized_frame_data)
+    normalized_frame_data = _ensure_footmod_keys_common(normalized_frame_data)
+    return normalized_frame_data
+
+
 def ensure_required_human_keys_kuavo_s54(frame_data: HumanFrame) -> HumanFrame:
     """
     Ensure kuavo_s54-required canonical keys exist.
@@ -199,6 +214,7 @@ ROBOT_KEY_NORMALIZER_DICT = {
     "roban_s14": ensure_required_human_keys_roban_s14,
     "kuavo_s52": ensure_required_human_keys_kuavo_s52,
     "roban_s17": ensure_required_human_keys_roban_s17,
+    "aelos": ensure_required_human_keys_aelos,
     "kuavo_s54": ensure_required_human_keys_kuavo_s54,
 }
 

@@ -10,6 +10,7 @@ ROBOT_XML_DICT = {
     "kuavo_s52": ASSET_ROOT / "kuavo_s52" / "biped_s52.xml",
     "kuavo_s45": ASSET_ROOT / "kuavo_s45" / "biped_s45_collision.xml",
     "kuavo_s54": ASSET_ROOT / "kuavo_s54" / "xml" / "biped_s54.xml",
+    "aelos": ASSET_ROOT / "aelos" / "xml" / "aelos.xml",
 }
 
 IK_CONFIG_DICT = {
@@ -51,6 +52,7 @@ IK_CONFIG_DICT = {
     },
     "bvh_qmai":{
         "roban_s17": IK_CONFIG_ROOT / "bvh_qmai_to_s17.json",
+        "aelos": IK_CONFIG_ROOT / "bvh_qmai_to_aelos.json",
     },
 }
 
@@ -60,6 +62,7 @@ ROBOT_BASE_DICT = {
     "kuavo_s45": "base_link",
     "kuavo_s54": "base_link",
     "roban_s17": "base_link",
+    "aelos": "robot_base",
 }
 
 VIEWER_CAM_DISTANCE_DICT = {
@@ -68,4 +71,5 @@ VIEWER_CAM_DISTANCE_DICT = {
     "kuavo_s45": 3.0,
     "kuavo_s54": 3.0,
     "roban_s17": 2.0,
+    "aelos": 1.2,
 }

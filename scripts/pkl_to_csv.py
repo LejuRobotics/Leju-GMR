@@ -92,6 +92,14 @@ ROBOT_LAYOUT_SPECS: dict[str, RobotLayoutSpec] = {
     "roban_s17": RobotLayoutSpec(robot="roban_s17", leg_dof=12, waist_dof=1, arm_dof=8),
     "kuavo_s52": RobotLayoutSpec(robot="kuavo_s52", leg_dof=12, waist_dof=1, arm_dof=14),
     "kuavo_s54": RobotLayoutSpec(robot="kuavo_s54", leg_dof=12, waist_dof=1, arm_dof=14),
+    "aelos": RobotLayoutSpec(
+        robot="aelos",
+        leg_dof=10,
+        waist_dof=0,
+        arm_dof=6,
+        leg_indices=tuple(range(6, 16)),
+        arm_indices=tuple(range(0, 6)),
+    ),
 }
 
 ROBOT_LAYOUTS: dict[str, RobotJointLayout] = {

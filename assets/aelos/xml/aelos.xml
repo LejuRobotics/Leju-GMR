@@ -1,0 +1,182 @@
+<mujoco model="aelos">
+  <compiler angle="radian" meshdir="../meshes" autolimits="true" />
+  <option timestep="0.005" />
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.1 0.1 0.1" specular="0.9 0.9 0.9" />
+    <rgba haze="0.15 0.25 0.35 1" />
+    <global azimuth="-140" elevation="-20" offwidth="2080" offheight="1170" />
+  </visual>
+  <default>
+    <default class="collision">
+      <geom contype="1" conaffinity="1" rgba="0.9 0.3 0.3 0.18" />
+    </default>
+  </default>
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1=".4 .5 .6" rgb2="0 0 0" width="100" height="100" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="1 1 1" rgb2="1 1 1" markrgb="0 0 0" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0" />
+    <mesh name="robot_base_visual" file="visual/robot_base_visual.stl" />
+    <mesh name="robot_base_collision" file="collision/robot_base_collision.stl" />
+    <mesh name="R_Hand_douji_1_visual" file="visual/R_Hand_douji_1_visual.stl" />
+    <mesh name="R_Hand_douji_1_collision" file="collision/R_Hand_douji_1_collision.stl" />
+    <mesh name="R_Hand_duoji__2__visual" file="visual/R_Hand_duoji__2__visual.stl" />
+    <mesh name="R_Hand_duoji__2__collision" file="collision/R_Hand_duoji__2__collision.stl" />
+    <mesh name="R_Hand_duoji__3__visual" file="visual/R_Hand_duoji__3__visual.stl" />
+    <mesh name="R_Hand_duoji__3__collision" file="collision/R_Hand_duoji__3__collision.stl" />
+    <mesh name="L_Hand_1__visual" file="visual/L_Hand_1__visual.stl" />
+    <mesh name="L_Hand_1__collision" file="collision/L_Hand_1__collision.stl" />
+    <mesh name="L_Hand_duoji__2_visual" file="visual/L_Hand_duoji__2_visual.stl" />
+    <mesh name="L_Hand_duoji__2_collision" file="collision/L_Hand_duoji__2_collision.stl" />
+    <mesh name="L_Hand_duoji__3_visual" file="visual/L_Hand_duoji__3_visual.stl" />
+    <mesh name="L_Hand_duoji__3_collision" file="collision/L_Hand_duoji__3_collision.stl" />
+    <mesh name="R_Leg__1_visual" file="visual/R_Leg__1_visual.stl" />
+    <mesh name="R_Leg__1_collision" file="collision/R_Leg__1_collision.stl" />
+    <mesh name="R_Leg_duoji_2_2_visual" file="visual/R_Leg_duoji_2_2_visual.stl" />
+    <mesh name="R_Leg_duoji_2_2_collision" file="collision/R_Leg_duoji_2_2_collision.stl" />
+    <mesh name="R_Leg_duoji_3__visual" file="visual/R_Leg_duoji_3__visual.stl" />
+    <mesh name="R_Leg_duoji_3__collision" file="collision/R_Leg_duoji_3__collision.stl" />
+    <mesh name="R_Leg__4_visual" file="visual/R_Leg__4_visual.stl" />
+    <mesh name="R_Leg__4_collision" file="collision/R_Leg__4_collision.stl" />
+    <mesh name="R_Leg_duoji_5__visual" file="visual/R_Leg_duoji_5__visual.stl" />
+    <mesh name="R_Leg_duoji_5__collision" file="collision/R_Leg_duoji_5__collision.stl" />
+    <mesh name="L_Leg_1__visual" file="visual/L_Leg_1__visual.stl" />
+    <mesh name="L_Leg_1__collision" file="collision/L_Leg_1__collision.stl" />
+    <mesh name="L_leg_duoji__2_visual" file="visual/L_leg_duoji__2_visual.stl" />
+    <mesh name="L_leg_duoji__2_collision" file="collision/L_leg_duoji__2_collision.stl" />
+    <mesh name="L_Leg_duoji__3_visual" file="visual/L_Leg_duoji__3_visual.stl" />
+    <mesh name="L_Leg_duoji__3_collision" file="collision/L_Leg_duoji__3_collision.stl" />
+    <mesh name="L_Leg__4_visual" file="visual/L_Leg__4_visual.stl" />
+    <mesh name="L_Leg__4_collision" file="collision/L_Leg__4_collision.stl" />
+    <mesh name="L_Leg_douji_5__visual" file="visual/L_Leg_douji_5__visual.stl" />
+    <mesh name="L_Leg_douji_5__collision" file="collision/L_Leg_douji_5__collision.stl" />
+  </asset>
+  <worldbody>
+    <geom name="floor" size="0 0 0.01" type="plane" material="groundplane" contype="1" conaffinity="0" priority="1" friction="0.6" condim="3" />
+    <light diffuse=".5 .5 .5" pos="-3 -3 5" dir="3 3 -5" castshadow="true" />
+    <body name="robot_base">
+      <freejoint name="root" />
+      <inertial pos="-0.011615 0.000247 0.256682" mass="0.89999997615814" fullinertia="0.00184014901 0.00193358846 0.00178445671 4.57598117e-05 -8.64779668e-05 -1.92657479e-05" />
+      <geom type="mesh" mesh="robot_base_visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" pos="0 0 0" quat="0.707106781 0 0 0.707106781" />
+      <geom type="mesh" mesh="robot_base_collision" class="collision" pos="0 0 0" quat="0.707106781 0 0 0.707106781" />
+      <body name="R_Hand_douji_1" pos="0.008406 -0.031275 0.269404" quat="0.701060872 -0.701061163 0.0922681061 0.0922686081">
+        <joint name="jointRarm1" type="hinge" axis="0 0 1" limited="false" damping="0.2" armature="0.001" />
+        <inertial pos="0.000147 -0.001249 -0.024092" mass="0.011180000379682" fullinertia="2.3590024075163e-06 1.7780735892598e-06 6.7503254976796e-07 -2.9979200390309e-08 -1.6106000705655e-10 -4.3733078995659e-08" />
+        <geom type="mesh" mesh="R_Hand_douji_1_visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+        <geom type="mesh" mesh="R_Hand_douji_1_collision" class="collision" />
+        <body name="R_Hand_duoji__2_" pos="0.000000 0.000001 -0.041500" quat="-0.358918034 -0.504357848 0.49556745 0.609273263">
+          <joint name="jointRarm2" type="hinge" axis="0 0 1" limited="true" range="0 3.14" damping="0.2" armature="0.001" />
+          <inertial pos="-0.009077 -0.002935 0.001425" mass="0.076999999582767" fullinertia="2.4332316209408e-05 1.566596827378e-05 1.3466315999821e-05 -1.0667594911875e-07 -1.1999650549924e-07 2.848122009355e-07" />
+          <geom type="mesh" mesh="R_Hand_duoji__2__visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+          <geom type="mesh" mesh="R_Hand_duoji__2__collision" class="collision" />
+          <body name="R_Hand_duoji__3_" pos="-0.046365 -0.012425 -0.000001" quat="0.871859806 -4.87254408e-05 6.50223215e-05 -0.489755523">
+            <joint name="jointRarm3" type="hinge" axis="0 0 1" limited="true" range="-2.19 1.63" damping="0.2" armature="0.001" />
+            <inertial pos="-0.002876 -0.008362 0.000058" mass="0.11100000143051" fullinertia="3.1080635325809e-05 2.0218438345852e-05 1.7643511794434e-05 1.2642801430865e-08 -1.4704575813965e-07 -5.2642365031237e-07" />
+            <geom type="mesh" mesh="R_Hand_duoji__3__visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+            <geom type="mesh" mesh="R_Hand_duoji__3__collision" class="collision" />
+          </body>
+        </body>
+      </body>
+      <body name="L_Hand_1_" pos="0.008406 0.030724 0.269404" quat="0.701055685 -0.701055275 0.0923102157 0.0923106251">
+        <joint name="jointLarm1" type="hinge" axis="0 0 1" limited="false" damping="0.2" armature="0.001" />
+        <inertial pos="0.000651 -0.001322 0.025034" mass="0.011180000379682" fullinertia="2.3590024075163e-06 1.7780735892598e-06 6.7503254976796e-07 -2.9979200390309e-08 -1.6106000705655e-10 -4.3733078995659e-08" />
+        <geom type="mesh" mesh="L_Hand_1__visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+        <geom type="mesh" mesh="L_Hand_1__collision" class="collision" />
+        <body name="L_Hand_duoji__2" pos="0.000000 0.000000 0.041500" quat="0.00621412254 -0.684581433 0.176986541 -0.707096465">
+          <joint name="jointLarm2" type="hinge" axis="0 0 1" limited="true" range="0 3.14" damping="0.2" armature="0.001" />
+          <inertial pos="-0.002886 -0.009123 -0.001426" mass="0.076999999582767" fullinertia="2.4332316209408e-05 1.566596827378e-05 1.3466315999821e-05 -1.0667594911875e-07 -1.1999650549924e-07 2.848122009355e-07" />
+          <geom type="mesh" mesh="L_Hand_duoji__2_visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+          <geom type="mesh" mesh="L_Hand_duoji__2_collision" class="collision" />
+          <body name="L_Hand_duoji__3" pos="-0.012423 -0.046365 0.000009" quat="0.999931195 3.05343088e-07 1.83050269e-06 0.0117305577">
+            <joint name="jointLarm3" type="hinge" axis="0 0 1" limited="true" range="-2.19 1.63" damping="0.2" armature="0.001" />
+            <inertial pos="-0.003469 -0.010594 -0.000061" mass="0.11100000143051" fullinertia="3.1080635325809e-05 2.0218438345852e-05 1.7643511794434e-05 1.2642801430865e-08 -1.4704575813965e-07 -5.2642365031237e-07" />
+            <geom type="mesh" mesh="L_Hand_duoji__3_visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+            <geom type="mesh" mesh="L_Hand_duoji__3_collision" class="collision" />
+          </body>
+        </body>
+      </body>
+      <body name="R_Leg__1" pos="0.008406 -0.027275 0.204407" quat="-0.430453655 0.560989603 0.430453645 -0.560990174">
+        <joint name="jointRleg1" type="hinge" axis="0 0 1" limited="true" range="0 1.4" damping="0.2" armature="0.001" />
+        <inertial pos="0.003485 0.016628 -0.000690" mass="0.021180000156164" fullinertia="4.375217338501e-06 3.2797624671446e-06 1.3282617371156e-06 -7.7754442295744e-08 3.2572604220547e-08 -1.0702529973538e-07" />
+        <geom type="mesh" mesh="R_Leg__1_visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+        <geom type="mesh" mesh="R_Leg__1_collision" class="collision" />
+        <body name="R_Leg_duoji_2_2" pos="0.010612 0.039604 -0.000000" quat="0.612380287 -0.182985747 0.683019491 -0.353540627">
+          <joint name="jointRleg2" type="hinge" axis="0 0 1" limited="true" range="-1.38 1.98" damping="0.2" armature="0.001" />
+          <inertial pos="-0.017556 0.023636 0.000174" mass="0.13830000162125" fullinertia="9.9915861335989e-05 8.8416508725748e-05 2.7654466015528e-05 5.672208484528e-07 3.2338228300695e-06 -6.9826619355059e-07" />
+          <geom type="mesh" mesh="R_Leg_duoji_2_2_visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+          <geom type="mesh" mesh="R_Leg_duoji_2_2_collision" class="collision" />
+          <body name="R_Leg_duoji_3_" pos="-0.040955 0.040960 0.000000" quat="0.96592403 1.01663236e-07 8.83203992e-07 0.258825748">
+            <joint name="jointRleg3" type="hinge" axis="0 0 1" limited="true" range="-0.54 2.38" damping="0.2" armature="0.001" />
+            <inertial pos="-0.010377 0.038882 -0.000509" mass="0.067970000207424" fullinertia="2.2194842411341e-05 1.4065387847668e-05 1.2543334414349e-05 1.425460084736e-07 1.780596553253e-07 -1.2297483037128e-06" />
+            <geom type="mesh" mesh="R_Leg_duoji_3__visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+            <geom type="mesh" mesh="R_Leg_duoji_3__collision" class="collision" />
+            <body name="R_Leg__4" pos="-0.012420 0.046373 -0.000000" quat="-0.965933994 4.0023308e-07 -2.31091519e-07 -0.258788559">
+              <joint name="jointRleg4" type="hinge" axis="0 0 1" limited="true" range="-1.45 1.8" damping="0.2" armature="0.001" />
+              <inertial pos="0.003846 0.016370 0.000509" mass="0.021180000156164" fullinertia="4.3384232141934e-06 3.3121863560683e-06 1.2662293000639e-06 1.2833161207901e-08 7.7632495510284e-08 2.2850776212577e-08" />
+              <geom type="mesh" mesh="R_Leg__4_visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+              <geom type="mesh" mesh="R_Leg__4_collision" class="collision" />
+              <body name="R_Leg_duoji_5_" pos="0.010613 0.039607 0.000000" quat="-0.683012836 8.46001241e-06 0.707106537 0.183013146">
+                <joint name="jointRleg5" type="hinge" axis="0 0 1" limited="true" range="-0.35 0.0" damping="0.2" armature="0.001" />
+                <inertial pos="-0.010649 -0.003383 -0.000030" mass="0.14309999346733" fullinertia="4.0839354823672e-05 2.6716376732524e-05 2.3156317813352e-05 -2.0378895117296e-07 -4.2565058532426e-07 -3.9567653875815e-07" />
+                <geom type="mesh" mesh="R_Leg_duoji_5__visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+                <geom type="mesh" mesh="R_Leg_duoji_5__collision" class="collision" />
+                <body name="R_toe_front" pos="-0.0105 0.0 -0.0625" />
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="L_Leg_1_" pos="0.008406 0.026725 0.204407" quat="-0.560989396 0.430453925 0.560989818 -0.430454108">
+        <joint name="jointLleg1" type="hinge" axis="0 0 1" limited="true" range="-1.4 0" damping="0.2" armature="0.001" />
+        <inertial pos="-0.005270 0.016150 -0.000690" mass="0.021180000156164" fullinertia="4.375217338501e-06 3.2797624671446e-06 1.3282617371156e-06 -7.7754442295744e-08 3.2572604220547e-08 -1.0702529973538e-07" />
+        <geom type="mesh" mesh="L_Leg_1__visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+        <geom type="mesh" mesh="L_Leg_1__collision" class="collision" />
+        <body name="L_leg_duoji__2" pos="-0.010613 0.039604 0.000000" quat="0.683008838 1.64828997e-06 0.707106811 0.183027006">
+          <joint name="jointLleg2" type="hinge" axis="0 0 1" limited="true" range="-1.38 1.98" damping="0.2" armature="0.001" />
+          <inertial pos="0.011688 0.027009 0.000174" mass="0.13830000162125" fullinertia="9.9915861335989e-05 8.8416508725748e-05 2.7654466015528e-05 5.672208484528e-07 3.2338228300695e-06 -6.9826619355059e-07" />
+          <geom type="mesh" mesh="L_leg_duoji__2_visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+          <geom type="mesh" mesh="L_leg_duoji__2_collision" class="collision" />
+          <body name="L_Leg_duoji__3" pos="0.014993 0.055949 0.000001" quat="0.965929724 -1.80938175e-06 3.05478777e-07 -0.258804497">
+            <joint name="jointLleg3" type="hinge" axis="0 0 1" limited="true" range="-0.54 2.38" damping="0.2" armature="0.001" />
+            <inertial pos="-0.010414 0.038858 -0.000509" mass="0.067970000207424" fullinertia="2.2194842411341e-05 1.4065387847668e-05 1.2543334414349e-05 1.425460084736e-07 1.780596553253e-07 -1.2297483037128e-06" />
+            <geom type="mesh" mesh="L_Leg_duoji__3_visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+            <geom type="mesh" mesh="L_Leg_duoji__3_collision" class="collision" />
+            <body name="L_Leg__4" pos="-0.012421 0.046373 -0.000000" quat="-0.866039628 -1.87937727e-06 -1.60171951e-06 0.499975362">
+              <joint name="jointLleg4" type="hinge" axis="0 0 1" limited="true" range="-1.45 1.8" damping="0.2" armature="0.001" />
+              <inertial pos="-0.016369 0.003847 0.000509" mass="0.021180000156164" fullinertia="4.3384232141934e-06 3.3121863560683e-06 1.2662293000639e-06 1.2833161207901e-08 7.7632495510284e-08 2.2850776212577e-08" />
+              <geom type="mesh" mesh="L_Leg__4_visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+              <geom type="mesh" mesh="L_Leg__4_collision" class="collision" />
+              <body name="L_Leg_douji_5_" pos="-0.039606 0.010617 0.000000" quat="-0.612390109 -0.499970237 0.500029933 -0.353522534">
+                <joint name="jointLleg5" type="hinge" axis="0 0 1" limited="true" range="0.0 0.35" damping="0.2" armature="0.001" />
+                <inertial pos="0.009152 0.001923 -0.000031" mass="0.14309999346733" fullinertia="4.0839354823672e-05 2.6716376732524e-05 2.3156317813352e-05 -2.0378895117296e-07 -4.2565058532426e-07 -3.9567653875815e-07" />
+                <geom type="mesh" mesh="L_Leg_douji_5__visual" contype="0" conaffinity="0" group="1" density="0" rgba="0.82 0.82 0.82 1" />
+                <geom type="mesh" mesh="L_Leg_douji_5__collision" class="collision" />
+                <body name="L_toe_front" pos="0.0081 0.0023 -0.0625" />
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="site_hips" pos="0.008406 -0.000275 0.204407" />
+      <body name="site_left_shoulder" pos="0.008406 0.030724 0.269404" />
+      <body name="site_right_shoulder" pos="0.008406 -0.031275 0.269404" />
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="jointRarm1" joint="jointRarm1" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointRarm2" joint="jointRarm2" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointRarm3" joint="jointRarm3" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointLarm1" joint="jointLarm1" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointLarm2" joint="jointLarm2" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointLarm3" joint="jointLarm3" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointRleg1" joint="jointRleg1" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointRleg2" joint="jointRleg2" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointRleg3" joint="jointRleg3" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointRleg4" joint="jointRleg4" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointRleg5" joint="jointRleg5" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointLleg1" joint="jointLleg1" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointLleg2" joint="jointLleg2" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointLleg3" joint="jointLleg3" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointLleg4" joint="jointLleg4" gear="1" ctrlrange="-3.1416 3.1416" />
+    <motor name="jointLleg5" joint="jointLleg5" gear="1" ctrlrange="-3.1416 3.1416" />
+  </actuator>
+</mujoco>

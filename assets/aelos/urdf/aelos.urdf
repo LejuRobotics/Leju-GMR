@@ -1,0 +1,422 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="Aelos">
+    <link name="robot_base">
+        <inertial>
+            <origin rpy="-3.137534 3.138377 -3.130478" xyz="0.000247 0.011615 0.256682"/>
+            <inertia ixx="0.001933588462322" ixy="-4.5759811719492e-05" izz="0.0017844567075766" iyz="8.647796678901e-05" iyy="0.0018401490076994" ixz="-1.9265747910296e-05"/>
+            <mass value="0.89999997615814"/>
+        </inertial>
+        <visual name="robot_base_visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/robot_base_visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="robot_base_collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/robot_base_collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointRarm1" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="robot_base"/>
+        <child link="R_Hand_douji_1"/>
+        <origin rpy="1.570796 2.879872 1.570797" xyz="-0.031275 -0.008406 0.269404"/>
+    </joint>
+    <link name="R_Hand_douji_1">
+        <inertial>
+            <origin rpy="-1.618327 1.588962 1.279137" xyz="0.000147 -0.001249 -0.024092"/>
+            <inertia ixx="2.3590024075163e-06" ixy="-2.9979200390309e-08" izz="6.7503254976796e-07" iyz="-4.3733078995659e-08" iyy="1.7780735892598e-06" ixz="-1.6106000705655e-10"/>
+            <mass value="0.011180000379682"/>
+        </inertial>
+        <visual name="R_Hand_douji_1_visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/R_Hand_douji_1_visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="R_Hand_douji_1_collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/R_Hand_douji_1_collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointRarm2" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="R_Hand_douji_1"/>
+        <child link="R_Hand_duoji__2_"/>
+        <origin rpy="-1.570871 2.879764 1.326530" xyz="0.000000 0.000001 -0.041500"/>
+    </joint>
+    <link name="R_Hand_duoji__2_">
+        <inertial>
+            <origin rpy="3.141126 3.141079 1.833339" xyz="-0.009077 -0.002935 0.001425"/>
+            <inertia ixx="2.4332316209408e-05" ixy="-1.0667594911875e-07" izz="1.3466315999821e-05" iyz="2.848122009355e-07" iyy="1.566596827378e-05" ixz="-1.1999650549924e-07"/>
+            <mass value="0.076999999582767"/>
+        </inertial>
+        <visual name="R_Hand_duoji__2__visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/R_Hand_duoji__2__visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="R_Hand_duoji__2__collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/R_Hand_duoji__2__collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointRarm3" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="R_Hand_duoji__2_"/>
+        <child link="R_Hand_duoji__3_"/>
+        <origin rpy="3.141444 3.141527 2.117974" xyz="-0.046365 -0.012425 -0.000001"/>
+    </joint>
+    <link name="R_Hand_duoji__3_">
+        <inertial>
+            <origin rpy="0.000721 3.142910 2.881041" xyz="-0.002876 -0.008362 0.000058"/>
+            <inertia ixx="3.1080635325809e-05" ixy="1.2642801430865e-08" izz="1.7643511794434e-05" iyz="-5.2642365031237e-07" iyy="2.0218438345852e-05" ixz="-1.4704575813965e-07"/>
+            <mass value="0.11100000143051"/>
+        </inertial>
+        <visual name="R_Hand_duoji__3__visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/R_Hand_duoji__3__visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="R_Hand_duoji__3__collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/R_Hand_duoji__3__collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointLarm1" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="robot_base"/>
+        <child link="L_Hand_1_"/>
+        <origin rpy="1.570797 2.879752 1.570797" xyz="0.030724 -0.008406 0.269404"/>
+    </joint>
+    <link name="L_Hand_1_">
+        <inertial>
+            <origin rpy="-1.671021 1.588070 1.226258" xyz="0.000651 -0.001322 0.025034"/>
+            <inertia ixx="2.3590024075163e-06" ixy="-2.9979200390309e-08" izz="6.7503254976796e-07" iyz="-4.3733078995659e-08" iyy="1.7780735892598e-06" ixz="-1.6106000705655e-10"/>
+            <mass value="0.011180000379682"/>
+        </inertial>
+        <visual name="L_Hand_1__visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/L_Hand_1__visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="L_Hand_1__collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/L_Hand_1__collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointLarm2" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="L_Hand_1_"/>
+        <child link="L_Hand_duoji__2"/>
+        <origin rpy="1.570982 4.450608 1.326412" xyz="0.000000 0.000000 0.041500"/>
+    </joint>
+    <link name="L_Hand_duoji__2">
+        <inertial>
+            <origin rpy="0.000537 3.140681 -0.279928" xyz="-0.002886 -0.009123 -0.001426"/>
+            <inertia ixx="2.4332316209408e-05" ixy="-1.0667594911875e-07" izz="1.3466315999821e-05" iyz="2.848122009355e-07" iyy="1.566596827378e-05" ixz="-1.1999650549924e-07"/>
+            <mass value="0.076999999582767"/>
+        </inertial>
+        <visual name="L_Hand_duoji__2_visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/L_Hand_duoji__2_visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="L_Hand_duoji__2_collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/L_Hand_duoji__2_collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointLarm3" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="L_Hand_duoji__2"/>
+        <child link="L_Hand_duoji__3"/>
+        <origin rpy="-3.141592 3.141589 -3.118131" xyz="-0.012423 -0.046365 0.000009"/>
+    </joint>
+    <link name="L_Hand_duoji__3">
+        <inertial>
+            <origin rpy="3.141268 3.141443 2.881762" xyz="-0.003469 -0.010594 -0.000061"/>
+            <inertia ixx="3.1080635325809e-05" ixy="1.2642801430865e-08" izz="1.7643511794434e-05" iyz="-5.2642365031237e-07" iyy="2.0218438345852e-05" ixz="-1.4704575813965e-07"/>
+            <mass value="0.11100000143051"/>
+        </inertial>
+        <visual name="L_Hand_duoji__3_visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/L_Hand_duoji__3_visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="L_Hand_duoji__3_collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/L_Hand_duoji__3_collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointRleg1" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="robot_base"/>
+        <child link="R_Leg__1"/>
+        <origin rpy="1.570797 2.879773 -3.141592" xyz="-0.027275 -0.008406 0.204407"/>
+    </joint>
+    <link name="R_Leg__1">
+        <inertial>
+            <origin rpy="-3.141592 3.141593 1.308978" xyz="0.003485 0.016628 -0.000690"/>
+            <inertia ixx="4.375217338501e-06" ixy="-7.7754442295744e-08" izz="1.3282617371156e-06" iyz="-1.0702529973538e-07" iyy="3.2797624671446e-06" ixz="3.2572604220547e-08"/>
+            <mass value="0.021180000156164"/>
+        </inertial>
+        <visual name="R_Leg__1_visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/R_Leg__1_visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="R_Leg__1_collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/R_Leg__1_collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointRleg2" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="R_Leg__1"/>
+        <child link="R_Leg_duoji_2_2"/>
+        <origin rpy="1.570798 2.356134 1.308980" xyz="0.010612 0.039604 -0.000000"/>
+    </joint>
+    <link name="R_Leg_duoji_2_2">
+        <inertial>
+            <origin rpy="-1.570795 3.141591 -2.356909" xyz="-0.017556 0.023636 0.000174"/>
+            <inertia ixx="9.9915861335989e-05" ixy="5.672208484528e-07" izz="2.7654466015528e-05" iyz="-6.9826619355059e-07" iyy="8.8416508725748e-05" ixz="3.2338228300695e-06"/>
+            <mass value="0.13830000162125"/>
+        </inertial>
+        <visual name="R_Leg_duoji_2_2_visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/R_Leg_duoji_2_2_visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="R_Leg_duoji_2_2_collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/R_Leg_duoji_2_2_collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointRleg3" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="R_Leg_duoji_2_2"/>
+        <child link="R_Leg_duoji_3_"/>
+        <origin rpy="-3.141592 3.141591 -2.617980" xyz="-0.040955 0.040960 0.000000"/>
+    </joint>
+    <link name="R_Leg_duoji_3_">
+        <inertial>
+            <origin rpy="3.141252 3.138307 -2.882301" xyz="-0.010377 0.038882 -0.000509"/>
+            <inertia ixx="2.2194842411341e-05" ixy="1.425460084736e-07" izz="1.2543334414349e-05" iyz="-1.2297483037128e-06" iyy="1.4065387847668e-05" ixz="1.780596553253e-07"/>
+            <mass value="0.067970000207424"/>
+        </inertial>
+        <visual name="R_Leg_duoji_3__visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/R_Leg_duoji_3__visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="R_Leg_duoji_3__collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/R_Leg_duoji_3__collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointRleg4" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="R_Leg_duoji_3_"/>
+        <child link="R_Leg__4"/>
+        <origin rpy="3.141592 3.141592 -2.618057" xyz="-0.012420 0.046373 -0.000000"/>
+    </joint>
+    <link name="R_Leg__4">
+        <inertial>
+            <origin rpy="-0.000000 3.141592 1.308985" xyz="0.003846 0.016370 0.000509"/>
+            <inertia ixx="4.3384232141934e-06" ixy="1.2833161207901e-08" izz="1.2662293000639e-06" iyz="2.2850776212577e-08" iyy="3.3121863560683e-06" ixz="7.7632495510284e-08"/>
+            <mass value="0.021180000156164"/>
+        </inertial>
+        <visual name="R_Leg__4_visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/R_Leg__4_visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="R_Leg__4_collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/R_Leg__4_collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointRleg5" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="R_Leg__4"/>
+        <child link="R_Leg_duoji_5_"/>
+        <origin rpy="-1.570799 4.450601 1.308987" xyz="0.010613 0.039607 0.000000"/>
+    </joint>
+    <link name="R_Leg_duoji_5_">
+        <inertial>
+            <origin rpy="-3.141592 3.141593 1.832584" xyz="-0.010649 -0.003383 -0.000030"/>
+            <inertia ixx="4.0839354823672e-05" ixy="-2.0378895117296e-07" izz="2.3156317813352e-05" iyz="-3.9567653875815e-07" iyy="2.6716376732524e-05" ixz="-4.2565058532426e-07"/>
+            <mass value="0.14309999346733"/>
+        </inertial>
+        <visual name="R_Leg_duoji_5__visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/R_Leg_duoji_5__visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="R_Leg_duoji_5__collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/R_Leg_duoji_5__collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointLleg1" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="robot_base"/>
+        <child link="L_Leg_1_"/>
+        <origin rpy="1.570796 3.403411 -3.141592" xyz="0.026725 -0.008406 0.204407"/>
+    </joint>
+    <link name="L_Leg_1_">
+        <inertial>
+            <origin rpy="-3.141593 3.141592 1.832615" xyz="-0.005270 0.016150 -0.000690"/>
+            <inertia ixx="4.375217338501e-06" ixy="-7.7754442295744e-08" izz="1.3282617371156e-06" iyz="-1.0702529973538e-07" iyy="3.2797624671446e-06" ixz="3.2572604220547e-08"/>
+            <mass value="0.021180000156164"/>
+        </inertial>
+        <visual name="L_Leg_1__visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/L_Leg_1__visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="L_Leg_1__collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/L_Leg_1__collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointLleg2" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="L_Leg_1_"/>
+        <child link="L_leg_duoji__2"/>
+        <origin rpy="-1.570796 1.832619 -1.308978" xyz="-0.010613 0.039604 0.000000"/>
+    </joint>
+    <link name="L_leg_duoji__2">
+        <inertial>
+            <origin rpy="-1.570797 3.141593 2.879117" xyz="0.011688 0.027009 0.000174"/>
+            <inertia ixx="9.9915861335989e-05" ixy="5.672208484528e-07" izz="2.7654466015528e-05" iyz="-6.9826619355059e-07" iyy="8.8416508725748e-05" ixz="3.2338228300695e-06"/>
+            <mass value="0.13830000162125"/>
+        </inertial>
+        <visual name="L_leg_duoji__2_visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/L_leg_duoji__2_visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="L_leg_duoji__2_collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/L_leg_duoji__2_collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointLleg3" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="L_leg_duoji__2"/>
+        <child link="L_Leg_duoji__3"/>
+        <origin rpy="3.141589 3.141593 2.618024" xyz="0.014993 0.055949 0.000001"/>
+    </joint>
+    <link name="L_Leg_duoji__3">
+        <inertial>
+            <origin rpy="3.141210 3.142220 -2.886966" xyz="-0.010414 0.038858 -0.000509"/>
+            <inertia ixx="2.2194842411341e-05" ixy="1.425460084736e-07" izz="1.2543334414349e-05" iyz="-1.2297483037128e-06" iyy="1.4065387847668e-05" ixz="1.780596553253e-07"/>
+            <mass value="0.067970000207424"/>
+        </inertial>
+        <visual name="L_Leg_duoji__3_visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/L_Leg_duoji__3_visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="L_Leg_duoji__3_collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/L_Leg_duoji__3_collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointLleg4" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="L_Leg_duoji__3"/>
+        <child link="L_Leg__4"/>
+        <origin rpy="-3.141591 3.141588 2.094452" xyz="-0.012421 0.046373 -0.000000"/>
+    </joint>
+    <link name="L_Leg__4">
+        <inertial>
+            <origin rpy="0.000000 3.141593 2.879683" xyz="-0.016369 0.003847 0.000509"/>
+            <inertia ixx="4.3384232141934e-06" ixy="1.2833161207901e-08" izz="1.2662293000639e-06" iyz="2.2850776212577e-08" iyy="3.3121863560683e-06" ixz="7.7632495510284e-08"/>
+            <mass value="0.021180000156164"/>
+        </inertial>
+        <visual name="L_Leg__4_visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/L_Leg__4_visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="L_Leg__4_collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/L_Leg__4_collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+    <joint name="jointLleg5" type="continuous">
+        <axis xyz="0 0 1"/>
+        <parent link="L_Leg__4"/>
+        <child link="L_Leg_douji_5_"/>
+        <origin rpy="-1.570795 4.450599 2.879682" xyz="-0.039606 0.010617 0.000000"/>
+    </joint>
+    <link name="L_Leg_douji_5_">
+        <inertial>
+            <origin rpy="-3.141592 3.141593 1.832588" xyz="0.009152 0.001923 -0.000031"/>
+            <inertia ixx="4.0839354823672e-05" ixy="-2.0378895117296e-07" izz="2.3156317813352e-05" iyz="-3.9567653875815e-07" iyy="2.6716376732524e-05" ixz="-4.2565058532426e-07"/>
+            <mass value="0.14309999346733"/>
+        </inertial>
+        <visual name="L_Leg_douji_5__visual">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/visual/L_Leg_douji_5__visual.stl"/>
+            </geometry>
+        </visual>
+        <collision name="L_Leg_douji_5__collision">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="../meshes/collision/L_Leg_douji_5__collision.stl"/>
+            </geometry>
+        </collision>
+    </link>
+</robot>

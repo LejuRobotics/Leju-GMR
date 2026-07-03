@@ -1,7 +1,7 @@
 import sys
 import os
-# Add parent directory to path to allow imports
-sys.path.insert(0, "/home/leju/workspace/motion-transformer/")
+# Add repository root to path to allow imports from this checkout.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 import mink
@@ -18,7 +18,7 @@ import general_motion_retargeting.utils.lafan_vendor.utils as utils
 from general_motion_retargeting.utils.lafan_vendor.extract import read_bvh, qmai_read_bvh
 
 import argparse
-from general_motion_retargeting.params import IK_CONFIG_DICT
+from general_motion_retargeting.params import IK_CONFIG_DICT, ROBOT_XML_DICT
 
 HERE = pathlib.Path(__file__).parent
 
@@ -223,12 +223,11 @@ def load_leju_bvh(bvh_file):
     return frames, human_height
 
 
-class BipedS17GMR(GeneralMotionRetargeting):
-    """General Motion Retargeting (GMR) for Biped S17 robot.
-    Adapted from KuavoGMR for the S17 robot platform.
-    """
+class BipedGMR(GeneralMotionRetargeting):
+    """General Motion Retargeting (GMR) for biped robots in this script."""
     def __init__(
         self,
+        robot_type: str = "roban_s17",
         actual_human_height: float = None,
         solver: str="daqp",
         damping: float=5e-1,
@@ -241,8 +240,8 @@ class BipedS17GMR(GeneralMotionRetargeting):
         self.contact_sequence = contact_sequence
         self.previous_human_data = None
 
-        # load the robot model for biped_s17
-        self.xml_file = str(HERE / ".." / "assets" / "biped_s17" / "xml" / "biped_s17.xml")
+        # load the robot model
+        self.xml_file = str(ROBOT_XML_DICT[robot_type])
 
         if verbose:
             print("Use robot model: ", self.xml_file)
@@ -274,7 +273,7 @@ class BipedS17GMR(GeneralMotionRetargeting):
             if verbose:
                 print(f"Motor ID {i}: {motor_name}")
 
-        # Load the IK config for biped_s17
+        # Load the IK config
         if ik_config_file is None:
             ik_config_file = "general_motion_retargeting/ik_configs/bvh_qmai_to_s17.json"
         with open(ik_config_file) as f:
@@ -324,7 +323,7 @@ class BipedS17GMR(GeneralMotionRetargeting):
             # Exclude the dummy_to_base_link joint (free joint)
             VELOCITY_LIMITS = {}
             for joint_name in self.robot_dof_names.keys():
-                if joint_name != 'dummy_to_base_link':
+                if joint_name not in {"dummy_to_base_link", "root"}:
                     VELOCITY_LIMITS[joint_name] = 3*np.pi
             self.ik_limits.append(mink.VelocityLimit(self.model, VELOCITY_LIMITS)) 
             
@@ -357,6 +356,9 @@ class BipedS17GMR(GeneralMotionRetargeting):
         return human_data_global
 
 
+BipedS17GMR = BipedGMR
+
+
 if __name__ == "__main__":
     import time
     import select
@@ -386,7 +388,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--robot",
-        choices=["roban_s17"],
+        choices=["roban_s17", "aelos"],
         default="roban_s17",
     )
 
@@ -452,7 +454,8 @@ if __name__ == "__main__":
 
     qpos_list = []
 
-    preprocessor = BipedS17GMR(
+    preprocessor = BipedGMR(
+        robot_type=args.robot,
         actual_human_height=1.57,
         solver="daqp",
         damping=5e-1,

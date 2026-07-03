@@ -261,7 +261,16 @@ python scripts/vis_robot_motion.py \
 
 若需录制视频，需添加参数 `--record_video `和` --video_path <your_video_path,mp4>`。
 
-(2)可视化文件夹中的批量动作：
+(2)可视化 CSV 动作：
+
+```bash
+python scripts/vis_robot_motion_csv.py \
+--robot <robot_name> \
+--csv_path <path_to_robot_data.csv> \
+--motion_fps 50
+```
+
+(3)可视化文件夹中的批量动作：
 
 ```bash
 python scripts/vis_robot_motion_dataset.py \
@@ -327,7 +336,7 @@ python scripts/pkl_to_csv.py \
 ```
 
 - 参数说明
-  - `--robot`（必需）：机器人型号。当前支持 `roban_s14`、`roban_s17`、`kuavo_s52`、`kuavo_s54`。
+  - `--robot`（必需）：机器人型号。当前支持 `roban_s14`、`roban_s17`、`kuavo_s52`、`kuavo_s54`、`aelos`。
   - `--pkl_file` / `--folder`（二选一，必需）：
     - `--pkl_file`：转换单个 `.pkl` 文件；
     - `--folder`：扫描目录下所有 `.pkl` 文件并批量转换。
@@ -363,6 +372,15 @@ python scripts/pkl_to_csv.py \
 ```
 ## 8、适配目录(详见`general_motion_retargeting/params.py`)
 
+<<<<<<< HEAD
+| Assigned ID | Robot/Data Format | Robot DoF | SMPLX ([AMASS](https://amass.is.tue.mpg.de/), [OMOMO](https://github.com/lijiaman/omomo_release)) | BVH [LAFAN1](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)| FBX ([OptiTrack](https://www.optitrack.com/)) |  BVH (Leju) | PICO ([XRoboToolkit](https://github.com/XR-Robotics/XRoboToolkit-PC-Service)) | More formats coming soon | 
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Roban S14 `roban_s14` | Leg (2\*6) + Waist (1) + Arm (2\*4) = 21 | TBD | TBD | TBD | ✅ | TBD |
+| 2 | Roban S17 `roban_s17` | Leg (2\*6) + Waist (1) + Arm (2\*4) = 21 | TBD | TBD | TBD | ✅ | TBD |
+| 3 | Kuavo S52 `kuavo_s52` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | TBD | TBD |  ✅ | TBD |
+| 4 | Kuavo S54 `kuavo_s54` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | TBD | TBD |  ✅ | TBD |
+| 5 | Aelos `aelos` | Leg (2\*5) + Waist (0) + Arm (2\*3) = 16 | TBD | TBD | TBD |  ✅ | TBD |
+=======
 ### 8.1 机器人 × 数据格式 支持矩阵
 
 | 机器人 | 标识 | DoF | qpos 维度 | SMPL-X | SMPL | BVH LAFAN1 | BVH Leju |
@@ -388,3 +406,4 @@ python scripts/pkl_to_csv.py \
 | `scripts/vis_robot_motion.py` | 可视化已保存的机器人 PKL |
 | `scripts/pkl_to_csv.py` | PKL → CSV，按机器人 DoF 严格校验 |
 | `scripts/batch_gmr_pkl_to_csv.py` | 批量 PKL → CSV（兼容 beyondmimic 格式） |
+>>>>>>> origin/main
