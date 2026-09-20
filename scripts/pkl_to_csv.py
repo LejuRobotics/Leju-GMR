@@ -148,7 +148,8 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Output path. For --pkl_file: .csv file path or output folder. "
-            "For --folder: output folder. Default: sibling 'csv' directory."
+            "For --folder: output folder. Default: csv/ next to the pkl/ directory "
+            "(e.g. output/aelos/pkl/foo.pkl -> output/aelos/csv/foo.csv)."
         ),
     )
     parser.add_argument(
@@ -177,8 +178,16 @@ def resolve_inputs(args: argparse.Namespace) -> list[Path]:
     return pkl_files
 
 
+def default_sidecar_dir(pkl_path: Path, kind: str) -> Path:
+    """Put csv/src beside the pkl directory, not inside it."""
+    parent = pkl_path.parent
+    if parent.name == "pkl":
+        return parent.parent / kind
+    return parent / kind
+
+
 def resolve_output_path(args: argparse.Namespace, pkl_path: Path) -> Path:
-    default_csv_dir = pkl_path.parent / "csv"
+    default_csv_dir = default_sidecar_dir(pkl_path, "csv")
     if args.output is None:
         return default_csv_dir / f"{pkl_path.stem}.csv"
     output: Path = args.output

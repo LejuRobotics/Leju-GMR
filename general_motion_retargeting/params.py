@@ -54,6 +54,10 @@ IK_CONFIG_DICT = {
         "roban_s17": IK_CONFIG_ROOT / "bvh_qmai_to_s17.json",
         "aelos": IK_CONFIG_ROOT / "bvh_qmai_to_aelos.json",
     },
+    "bvh_qingtong":{
+        "aelos": IK_CONFIG_ROOT / "bvh_qingtong_to_aelos.json",
+        "roban_s17": IK_CONFIG_ROOT / "bvh_qingtong_to_s17.json",
+    },
 }
 
 ROBOT_BASE_DICT = {

@@ -3,6 +3,7 @@ import mink
 import mujoco as mj
 import numpy as np
 import json
+import re
 from scipy.spatial.transform import Rotation as R
 from .params import ROBOT_XML_DICT, IK_CONFIG_DICT
 from rich import print
@@ -19,6 +20,8 @@ class GeneralMotionRetargeting:
         damping: float=5e-1, # change from 1e-1 to 1e-2.
         verbose: bool=True,
         use_velocity_limit: bool=False,
+        use_collision_avoidance: bool=False,
+        collision_avoidance_config: dict=None,
     ) -> None:
 
         # load the robot model
@@ -79,6 +82,7 @@ class GeneralMotionRetargeting:
         self.use_ik_match_table2 = ik_config["use_ik_match_table2"]
         self.human_scale_table = ik_config["human_scale_table"]
         self.ground = ik_config["ground_height"] * np.array([0, 0, 1])
+        self.posture_weight = float(ik_config.get("posture_weight", 0.0) or 0.0)
 
         self.max_iter = 10
 
@@ -99,13 +103,125 @@ class GeneralMotionRetargeting:
         if use_velocity_limit:
             VELOCITY_LIMITS = {k: 3*np.pi for k in self.robot_motor_names.keys()}
             self.ik_limits.append(mink.VelocityLimit(self.model, VELOCITY_LIMITS)) 
+
+        # Self-collision avoidance (e.g. keep the arms away from the thighs).
+        # 支持多个 CollisionAvoidanceLimit（不同碰撞对可用不同参数）。
+        self.collision_avoidance_limits = []
+        if use_collision_avoidance:
+            self.collision_avoidance_limits = self.build_collision_avoidance_limit(
+                collision_avoidance_config
+            ) or []
+            if self.collision_avoidance_limits:
+                self.ik_limits.extend(self.collision_avoidance_limits)
+                if verbose:
+                    n_pairs = sum(len(l.geom_id_pairs) for l in self.collision_avoidance_limits)
+                    print(f"[GMR] Collision avoidance enabled: {n_pairs} geom pairs "
+                          f"in {len(self.collision_avoidance_limits)} limit(s)")
+            elif verbose:
+                print("[GMR] Collision avoidance requested but no geom pairs were built; skipping")
             
         self.setup_retarget_configuration()
         
         self.ground_offset = 0.0
 
+    def build_collision_avoidance_limit(self, config: dict = None):
+        """Build a mink.CollisionAvoidanceLimit for self-collision avoidance.
+
+        Collision geoms are grouped by the body they are attached to, and body
+        groups are matched against `body_group_patterns` (regex, first match
+        wins). Every group pair listed in `group_pairs` is then checked for
+        collisions by the QP solver.
+
+        Currently tuned for the aelos robot (arm geoms vs. leg/torso geoms).
+        """
+        config = config or {}
+        # regex patterns mapping a body name to a collision group
+        body_group_patterns = config.get("body_group_patterns", {
+            "left_hand_end": r"^L_Hand_duoji__3$",
+            "right_hand_end": r"^R_Hand_duoji__3_$",
+            "left_leg": r"^L_Leg_1_$|^L_leg_duoji__2$",
+            "right_leg": r"^R_Leg__1$|^R_Leg_duoji_2_2$",
+            "torso": r"^robot_base$",
+        })
+        # which group pairs should avoid each other.
+        # 每项可以是 (组A, 组B) 使用默认参数，或 (组A, 组B, {参数覆盖}) 单独
+        # 指定 gain/minimum_distance/detection_distance（如手-躯干用更小的
+        # 安全距离，避免胸前动作被推得太开）。
+        group_pairs = config.get("group_pairs", [
+            ("left_hand_end", "left_leg"),
+            ("left_hand_end", "right_leg"),
+            ("right_hand_end", "left_leg"),
+            ("right_hand_end", "right_leg"),
+            ("left_hand_end", "torso", {"minimum_distance": 0.01, "detection_distance": 0.03}),
+            ("right_hand_end", "torso", {"minimum_distance": 0.01, "detection_distance": 0.03}),
+        ])
+        gain = config.get("gain", 0.5)
+        minimum_distance = config.get("minimum_distance", 0.035)
+        detection_distance = config.get("detection_distance", 0.05)
+
+        # collect collision geoms (contype/conaffinity != 0) per group
+        group_geoms = {group: [] for group in body_group_patterns}
+        for geom_id in range(self.model.ngeom):
+            if self.model.geom_contype[geom_id] == 0 and self.model.geom_conaffinity[geom_id] == 0:
+                continue  # visual-only geom
+            body_id = self.model.geom_bodyid[geom_id]
+            body_name = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_BODY, body_id)
+            for group, pattern in body_group_patterns.items():
+                if re.match(pattern, body_name):
+                    group_geoms[group].append(geom_id)
+                    break
+
+        if any(len(geoms) == 0 for geoms in group_geoms.values()):
+            print("[GMR] [warn] Some collision groups have no geoms:",
+                  {k: len(v) for k, v in group_geoms.items()})
+            return None
+
+        # 按参数组合聚合碰撞对：参数相同的对共用一个 limit（减少 QP 约束
+        # 行数），参数不同的对（如手-躯干）单独建 limit。
+        pairs_by_params = {}  # (gain, min_dist, detect_dist) -> [geom_pair, ...]
+        for entry in group_pairs:
+            group_a, group_b = entry[0], entry[1]
+            overrides = entry[2] if len(entry) > 2 else {}
+            if group_a not in group_geoms or group_b not in group_geoms:
+                continue
+            params = (
+                overrides.get("gain", gain),
+                overrides.get("minimum_distance", minimum_distance),
+                overrides.get("detection_distance", detection_distance),
+            )
+            pairs_by_params.setdefault(params, []).append(
+                (group_geoms[group_a], group_geoms[group_b])
+            )
+
+        limits = []
+        for (g, min_d, det_d), collision_pairs in pairs_by_params.items():
+            limits.append(mink.CollisionAvoidanceLimit(
+                self.model,
+                collision_pairs,
+                gain=g,
+                minimum_distance_from_collisions=min_d,
+                collision_detection_distance=det_d,
+            ))
+        return limits or None
+
     def setup_retarget_configuration(self):
         self.configuration = mink.Configuration(self.model)
+
+        # 将初始 qpos 夹紧到关节限位范围内。
+        # 模型默认 qpos 全为 0，当 XML 中收紧了关节限位（如 aelos 的 arm2
+        # 下限从 0 改为 0.1）后，默认姿态会落在限位之外；IK 从限位外的
+        # 姿态开始求解时，ConfigurationLimit 要求的恢复速度会超过速度
+        # 限制，导致 QP 无解（NoSolutionFound）而崩溃。
+        for jnt in range(self.model.njnt):
+            if self.model.jnt_type[jnt] == mj.mjtJoint.mjJNT_FREE:
+                continue  # 自由关节（浮动基座）没有限位
+            if not self.model.jnt_limited[jnt]:
+                continue  # 未声明 limited 的关节不限位
+            padr = self.model.jnt_qposadr[jnt]
+            lo, hi = self.model.jnt_range[jnt]
+            q = self.configuration.data.qpos[padr]
+            self.configuration.data.qpos[padr] = min(max(q, lo), hi)
+        self.configuration.update()
     
         self.tasks1 = []
         self.tasks2 = []
@@ -146,6 +262,17 @@ class GeneralMotionRetargeting:
                 self.tasks2.append(task)
                 self.task_errors2[task] = []
 
+        # Weak regularizer toward the default pose. On aelos this stops sequential
+        # IK from walking into joint limits when the human is nearly standing.
+        posture_weight = float(getattr(self, "posture_weight", 0.0) or 0.0)
+        if posture_weight > 0.0:
+            posture_task = mink.PostureTask(self.model, cost=posture_weight)
+            posture_task.set_target_from_configuration(self.configuration)
+            if self.use_ik_match_table1:
+                self.tasks1.append(posture_task)
+            elif self.use_ik_match_table2:
+                self.tasks2.append(posture_task)
+
   
     def update_targets(self, human_data, offset_to_ground=False):
         # scale human data in local frame
@@ -179,7 +306,8 @@ class GeneralMotionRetargeting:
             curr_error = self.error1()
             dt = self.configuration.model.opt.timestep
             vel1 = mink.solve_ik(
-                self.configuration, self.tasks1, dt, self.solver, self.damping, self.ik_limits
+                self.configuration, self.tasks1, dt, self.solver,
+                damping=self.damping, limits=self.ik_limits,
             )
             self.configuration.integrate_inplace(vel1, dt)
             next_error = self.error1()
@@ -188,7 +316,8 @@ class GeneralMotionRetargeting:
                 curr_error = next_error
                 dt = self.configuration.model.opt.timestep
                 vel1 = mink.solve_ik(
-                    self.configuration, self.tasks1, dt, self.solver, self.damping, self.ik_limits
+                    self.configuration, self.tasks1, dt, self.solver,
+                    damping=self.damping, limits=self.ik_limits,
                 )
                 self.configuration.integrate_inplace(vel1, dt)
                 next_error = self.error1()
@@ -198,7 +327,8 @@ class GeneralMotionRetargeting:
             curr_error = self.error2()
             dt = self.configuration.model.opt.timestep
             vel2 = mink.solve_ik(
-                self.configuration, self.tasks2, dt, self.solver, self.damping, self.ik_limits
+                self.configuration, self.tasks2, dt, self.solver,
+                damping=self.damping, limits=self.ik_limits,
             )
             self.configuration.integrate_inplace(vel2, dt)
             next_error = self.error2()
@@ -208,7 +338,8 @@ class GeneralMotionRetargeting:
                 # Solve the IK problem with the second task
                 dt = self.configuration.model.opt.timestep
                 vel2 = mink.solve_ik(
-                    self.configuration, self.tasks2, dt, self.solver, self.damping, self.ik_limits
+                    self.configuration, self.tasks2, dt, self.solver,
+                    damping=self.damping, limits=self.ik_limits,
                 )
                 self.configuration.integrate_inplace(vel2, dt)
                 

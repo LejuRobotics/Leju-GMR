@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 # Add repository root to path to allow imports from this checkout.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -15,12 +16,40 @@ from typing import Dict
 import pathlib
 
 import general_motion_retargeting.utils.lafan_vendor.utils as utils
-from general_motion_retargeting.utils.lafan_vendor.extract import read_bvh, qmai_read_bvh
+from general_motion_retargeting.utils.lafan_vendor.extract import read_bvh, qmai_read_bvh, qingtong_read_bvh
 
 import argparse
 from general_motion_retargeting.params import IK_CONFIG_DICT, ROBOT_XML_DICT
 
 HERE = pathlib.Path(__file__).parent
+
+
+def resolve_robot_output_path(
+    user_path: str | None,
+    robot: str,
+    bvh_file: str,
+    kind: str,
+    suffix: str,
+) -> str:
+    stem = pathlib.Path(bvh_file).stem
+    default_path = pathlib.Path("output") / robot / kind / f"{stem}{suffix}"
+    if user_path is None:
+        return str(default_path)
+    path = pathlib.Path(user_path)
+    if path.suffix.lower() == suffix:
+        return str(path)
+    return str(path / f"{stem}{suffix}")
+
+
+def read_bvh_frame_time(bvh_file: str) -> float | None:
+    with open(bvh_file, "r", encoding="utf-8", errors="ignore") as file:
+        for line in file:
+            match = re.match(r"\s*Frame Time:\s+([\d.]+)", line)
+            if match:
+                frame_time = float(match.group(1))
+                return frame_time if frame_time > 0 else None
+    return None
+
 
 def load_lafan1_bvh(bvh_file):
     """
@@ -54,8 +83,6 @@ def load_lafan1_bvh(bvh_file):
         frames.append(result)
     
     human_height = result["Head"][0][2] - min(result["LeftFootMod"][0][2], result["RightFootMod"][0][2])
-    # human_height = human_height + 0.2  # cm to m
-    human_height = 1.75  # cm to m
 
     return frames, human_height
 
@@ -78,19 +105,54 @@ def load_qmai_bvh(bvh_file):
             position = global_data[1][frame, i] @ rotation_matrix.T / 100  # cm to m
             result[bone] = (position, orientation)
 
-        # Add modified foot pose for dance_bj format
-        if "LFoot" in result and "LToe" in result:
-            result["LFootMod"] = (result["LFoot"][0], result["LToe"][1])
-        if "RFoot" in result and "RToe" in result:
-            result["RFootMod"] = (result["RFoot"][0], result["RToe"][1])
+        # Add modified foot pose: 脚底姿态取自脚趾，脚踝位置保留
+        if "LeftFoot" in result and "LeftToeBase" in result:
+            result["LeftFootMod"] = (result["LeftFoot"][0], result["LeftToeBase"][1])
+        if "RightFoot" in result and "RightToeBase" in result:
+            result["RightFootMod"] = (result["RightFoot"][0], result["RightToeBase"][1])
         frames.append(result)
     
     # Calculate human height
-    if "Head" in result and "LFootMod" in result and "RFootMod" in result:
-        human_height = result["Head"][0][2] - min(result["LFootMod"][0][2], result["RFootMod"][0][2])
+    if "Head" in result and "LeftFootMod" in result and "RightFootMod" in result:
+        human_height = result["Head"][0][2] - min(result["LeftFootMod"][0][2], result["RightFootMod"][0][2])
     else:
         human_height = 1.75  # default value
     
+    return frames, human_height
+
+
+def load_qingtong_bvh(bvh_file):
+    """Load qingtong (ChingMu, SOMA skeleton) BVH file for aelos."""
+    data = qingtong_read_bvh(bvh_file)
+    global_data = utils.quat_fk(data.quats, data.pos, data.parents)
+
+    rotation_matrix = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
+    rotation_quat = R.from_matrix(rotation_matrix).as_quat()
+    # Convert from [x, y, z, w] to [w, x, y, z] format for scalar_first=True
+    rotation_quat = np.array([rotation_quat[3], rotation_quat[0], rotation_quat[1], rotation_quat[2]])
+
+    frames = []
+    for frame in range(data.pos.shape[0]):
+        result = {}
+        for i, bone in enumerate(data.bones):
+            orientation = utils.quat_mul(rotation_quat, global_data[0][frame, i])
+            # qingtong uses cm, convert to m: cm -> m = / 100
+            position = global_data[1][frame, i] @ rotation_matrix.T / 100  # cm to m
+            result[bone] = (position, orientation)
+
+        # Add modified foot pose: 脚底姿态取自脚趾，脚踝位置保留
+        if "LeftFoot" in result and "LeftToeBase" in result:
+            result["LeftFootMod"] = (result["LeftFoot"][0], result["LeftToeBase"][1])
+        if "RightFoot" in result and "RightToeBase" in result:
+            result["RightFootMod"] = (result["RightFoot"][0], result["RightToeBase"][1])
+        frames.append(result)
+
+    # Calculate human height
+    if "Head" in result and "LeftFootMod" in result and "RightFootMod" in result:
+        human_height = result["Head"][0][2] - min(result["LeftFootMod"][0][2], result["RightFootMod"][0][2])
+    else:
+        human_height = 1.75  # default value
+
     return frames, human_height
 
 
@@ -207,16 +269,16 @@ def load_leju_bvh(bvh_file):
         else:
             result = original_result.copy()
 
-        # Add modified foot pose for dance_bj format
-        if "LFoot" in result and "LToe" in result:
-            result["LFootMod"] = (result["LFoot"][0], result["LToe"][1])
-        if "RFoot" in result and "RToe" in result:
-            result["RFootMod"] = (result["RFoot"][0], result["RToe"][1])
+        # Add modified foot pose: 脚底姿态取自脚趾，脚踝位置保留
+        if "LeftFoot" in result and "LeftToeBase" in result:
+            result["LeftFootMod"] = (result["LeftFoot"][0], result["LeftToeBase"][1])
+        if "RightFoot" in result and "RightToeBase" in result:
+            result["RightFootMod"] = (result["RightFoot"][0], result["RightToeBase"][1])
         frames.append(result)
     
     # Calculate human height
-    if "Head" in result and "LFootMod" in result and "RFootMod" in result:
-        human_height = result["Head"][0][2] - min(result["LFootMod"][0][2], result["RFootMod"][0][2])
+    if "Head" in result and "LeftFootMod" in result and "RightFootMod" in result:
+        human_height = result["Head"][0][2] - min(result["LeftFootMod"][0][2], result["RightFootMod"][0][2])
     else:
         human_height = 1.75  # default value
     
@@ -235,6 +297,8 @@ class BipedGMR(GeneralMotionRetargeting):
         use_velocity_limit: bool=False,
         contact_sequence: Dict[str, np.ndarray] = None,
         ik_config_file: str = None,  # 新增参数：允许指定json配置文件
+        use_collision_avoidance: bool=False,
+        collision_avoidance_config: dict=None,
     ) -> None:
         # used for contact offset
         self.contact_sequence = contact_sequence
@@ -301,6 +365,7 @@ class BipedGMR(GeneralMotionRetargeting):
         self.use_ik_match_table2 = ik_config["use_ik_match_table2"]
         self.human_scale_table = ik_config["human_scale_table"]
         self.ground = ik_config["ground_height"] * np.array([0, 0, 1])
+        self.posture_weight = float(ik_config.get("posture_weight", 0.0) or 0.0)
 
         self.max_iter = 10
 
@@ -326,6 +391,22 @@ class BipedGMR(GeneralMotionRetargeting):
                 if joint_name not in {"dummy_to_base_link", "root"}:
                     VELOCITY_LIMITS[joint_name] = 3*np.pi
             self.ik_limits.append(mink.VelocityLimit(self.model, VELOCITY_LIMITS)) 
+
+        # Self-collision avoidance (e.g. keep the arms away from the thighs)
+        # 支持多个 CollisionAvoidanceLimit（不同碰撞对可用不同参数）
+        self.collision_avoidance_limits = []
+        if use_collision_avoidance:
+            self.collision_avoidance_limits = self.build_collision_avoidance_limit(
+                collision_avoidance_config
+            ) or []
+            if self.collision_avoidance_limits:
+                self.ik_limits.extend(self.collision_avoidance_limits)
+                if verbose:
+                    n_pairs = sum(len(l.geom_id_pairs) for l in self.collision_avoidance_limits)
+                    print(f"[GMR] Collision avoidance enabled: {n_pairs} geom pairs "
+                          f"in {len(self.collision_avoidance_limits)} limit(s)")
+            elif verbose:
+                print("[GMR] Collision avoidance requested but no geom pairs were built; skipping")
             
         self.setup_retarget_configuration()
         
@@ -375,7 +456,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--format",
-        choices=["lafan1", "qmai", "leju", "nokov"],
+        choices=["lafan1", "qmai", "qingtong", "leju", "nokov"],
         default="qmai",
     )
 
@@ -401,7 +482,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--video_path",
         type=str,
-        default="output/videos/example.mp4",
+        default=None,
+        help=(
+            "Path to save the recorded video. "
+            "Default: output/<robot>/video/<bvh_stem>.mp4"
+        ),
     )
 
     parser.add_argument(
@@ -413,14 +498,51 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_path",
         type=str,
-        default="output/csv",
-        help="Path to save the robot motion.",
+        default=None,
+        help=(
+            "Path to save the robot motion pickle. "
+            "Default: output/<robot>/pkl/<bvh_stem>.pkl"
+        ),
     )
     
     parser.add_argument(
         "--motion_fps",
         default=30,
         type=int,
+    )
+
+    parser.add_argument(
+        "--human_height",
+        default=None,
+        type=float,
+        help=(
+            "Override the human height in meters used for IK scaling. "
+            "Default: the height measured from the BVH itself."
+        ),
+    )
+
+    parser.add_argument(
+        "--human_height_fallback",
+        default=1.57,
+        type=float,
+        help=(
+            "Human height in meters used when the BVH-measured height is "
+            "unavailable or invalid. Default: 1.57"
+        ),
+    )
+
+    parser.add_argument(
+        "--collision_avoidance",
+        action="store_true",
+        default=True,
+        help="Enable self-collision avoidance (arms vs legs/torso) during IK.",
+    )
+
+    parser.add_argument(
+        "--no_collision_avoidance",
+        action="store_false",
+        dest="collision_avoidance",
+        help="Disable self-collision avoidance (enabled by default).",
     )
 
     args = parser.parse_args()
@@ -430,8 +552,12 @@ if __name__ == "__main__":
     
     # 自动生成相关路径
     json_file_path = IK_CONFIG_DICT[f"bvh_{args.format}"][args.robot]
-    video_output_path = args.video_path
-    pkl_output_path = args.save_path
+    pkl_output_path = resolve_robot_output_path(
+        args.save_path, args.robot, bvh_file_path, "pkl", ".pkl"
+    )
+    video_output_path = resolve_robot_output_path(
+        args.video_path, args.robot, bvh_file_path, "video", ".mp4"
+    )
     
     print(f"[配置] BVH文件: {bvh_file_path}")
     print(f"[配置] JSON配置: {json_file_path}")
@@ -443,6 +569,10 @@ if __name__ == "__main__":
         mocap_data, actual_human_height = load_qmai_bvh(
             bvh_file=bvh_file_path
         )
+    elif args.format == "qingtong":
+        mocap_data, actual_human_height = load_qingtong_bvh(
+            bvh_file=bvh_file_path
+        )
     elif args.format == "leju":
         mocap_data, actual_human_height = load_leju_bvh(
             bvh_file=bvh_file_path
@@ -451,17 +581,36 @@ if __name__ == "__main__":
         mocap_data, actual_human_height = load_lafan1_bvh(
             bvh_file=bvh_file_path
         )
+    source_frame_time = read_bvh_frame_time(bvh_file_path)
+    source_fps = 1.0 / source_frame_time if source_frame_time is not None else args.motion_fps
+    print(f"[配置] BVH FPS: {source_fps:.3f}")
+
+    # 人体身高：优先使用命令行覆盖，否则使用 loader 从 BVH 实测的身高。
+    # loader 的实测值来自 Head 到较低脚底的距离，与 ik_config 中
+    # human_height_assumption 的统计口径一致，因此默认直接采用。
+    if args.human_height is not None:
+        actual_human_height = args.human_height
+        print(f"[配置] 人体身高: {actual_human_height:.4f} m (命令行 --human_height 指定)")
+    elif actual_human_height is None or not np.isfinite(actual_human_height) or actual_human_height <= 0:
+        actual_human_height = args.human_height_fallback
+        print(
+            f"[配置] 人体身高: {actual_human_height:.4f} m "
+            f"(BVH 实测无效，使用 --human_height_fallback)"
+        )
+    else:
+        print(f"[配置] 人体身高: {actual_human_height:.4f} m (由 BVH 实测)")
 
     qpos_list = []
 
     preprocessor = BipedGMR(
         robot_type=args.robot,
-        actual_human_height=1.57,
+        actual_human_height=actual_human_height,
         solver="daqp",
         damping=5e-1,
         verbose=True,
         use_velocity_limit=True,
         ik_config_file=json_file_path,  # 使用对应的json配置文件
+        use_collision_avoidance=args.collision_avoidance,
     )
 
     robot_motion_viewer = RobotMotionViewer(
@@ -520,15 +669,20 @@ if __name__ == "__main__":
             dof_pos = np.array([q[7:] for q in qpos_list])
             local_body_pos = None
             body_names = None
+            duration_sec = len(qpos_list) / source_fps
             motion_data = {
-                "fps": args.motion_fps,
+                "fps": source_fps,
+                "source_fps": source_fps,
+                "frame_time": 1.0 / source_fps,
+                "duration_sec": duration_sec,
+                "viewer_fps": args.motion_fps,
                 "root_pos": root_pos,
                 "root_rot": root_rot,
                 "dof_pos": dof_pos,
                 "local_body_pos": local_body_pos,
                 "link_body_list": body_names,
             }
-            os.makedirs(os.path.dirname(pkl_output_path), exist_ok=True)
+            os.makedirs(os.path.dirname(os.path.abspath(pkl_output_path)), exist_ok=True)
             with open(pkl_output_path, "wb") as f:
                 pickle.dump(motion_data, f)
             print(f"Saved to {pkl_output_path}")

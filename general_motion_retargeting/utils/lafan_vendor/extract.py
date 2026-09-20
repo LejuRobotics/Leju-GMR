@@ -826,11 +826,199 @@ def qmai_read_bvh(filename, start=None, end=None, order=None):
 
     return Anim(rotations, positions, offsets, parents, names)
 
-def qmai_to_lafan(names, offsets, parents, rotations, positions):
-    #将qmai的bvh调整成lafan格式，名称映射即删除多余骨骼（如手指）
 
-    #创建lafan和seed的名称对照表,并替换
-    SEED_TO_LAFAN_MAPPING = {
+def _parse_bvh_hierarchy(filename):
+    """Parse the HIERARCHY block of a BVH file.
+
+    Channel counts are tracked per joint instead of in a single shared variable, so
+    skeletons declaring more than one 6-channel joint parse correctly. The SOMA
+    skeleton used by qingtong is such a case: it carries a dummy `Root` joint
+    (6 channels, all zeros) above the real `Hips` root (6 channels).
+
+    :param filename: BVH filename
+    :return: (names, channels_per_joint, offsets, parents, order)
+    """
+    names = []
+    channels_per_joint = []
+    offsets = []
+    parents = []
+    order = None
+    stack = []
+    end_site = False
+
+    with open(filename, "r") as f:
+        for line in f:
+            if line.startswith("MOTION"):
+                break
+
+            if "End Site" in line:
+                end_site = True
+                continue
+
+            if re.match(r"^\s*\{", line):
+                continue
+
+            if re.match(r"^\s*\}", line):
+                if end_site:
+                    end_site = False
+                elif stack:
+                    stack.pop()
+                continue
+
+            if end_site:
+                # OFFSET inside an End Site block is not a joint offset.
+                continue
+
+            jmatch = re.match(r"\s*(?:ROOT|JOINT)\s+(\S+)", line)
+            if jmatch:
+                names.append(jmatch.group(1))
+                channels_per_joint.append(0)
+                offsets.append([0.0, 0.0, 0.0])
+                parents.append(stack[-1] if stack else -1)
+                stack.append(len(names) - 1)
+                continue
+
+            offmatch = re.match(
+                r"\s*OFFSET\s+([\-\d\.eE+]+)\s+([\-\d\.eE+]+)\s+([\-\d\.eE+]+)", line
+            )
+            if offmatch:
+                offsets[stack[-1]] = [float(v) for v in offmatch.groups()]
+                continue
+
+            chanmatch = re.match(r"\s*CHANNELS\s+(\d+)", line)
+            if chanmatch:
+                num_channels = int(chanmatch.group(1))
+                channels_per_joint[stack[-1]] = num_channels
+                if order is None:
+                    channelis = 0 if num_channels == 3 else 3
+                    channelie = 3 if num_channels == 3 else 6
+                    parts = line.split()[2 + channelis:2 + channelie]
+                    if any([p not in channelmap for p in parts]):
+                        continue
+                    order = "".join([channelmap[p] for p in parts])
+                continue
+
+    return (
+        names,
+        np.array(channels_per_joint, dtype=int),
+        np.array(offsets, dtype=float),
+        np.array(parents, dtype=int),
+        order,
+    )
+
+
+def qingtong_read_bvh(filename, start=None, end=None, order=None):
+    """
+    Reads a qingtong (ChingMu) BVH file that uses the SOMA skeleton.
+
+    Differences from read_bvh()/qmai_read_bvh():
+      * channel counts are resolved per joint, so the dummy `Root` joint above
+        `Hips` no longer corrupts the per-frame layout;
+      * that dummy `Root` joint is dropped and `Hips` becomes the root;
+      * every frame is sliced joint by joint and validated against the hierarchy.
+
+    :param filename: BVh filename
+    :param start: first frame to keep (inclusive)
+    :param end: frame to stop at (exclusive)
+    :param order: order of euler rotations, derived from the file when None
+    :return: A simple Anim object conatining the extracted information.
+    """
+    names, channels_per_joint, offsets, parents, file_order = _parse_bvh_hierarchy(filename)
+    if order is None:
+        order = file_order
+
+    # SOMA carries a dummy `Root` joint with a zero offset and no motion of its own;
+    # `Hips` is the real root. Dropping it also drops its channels from every
+    # motion row, so remember how many leading values to skip.
+    dropped_leading_channels = 0
+    if len(names) > 1 and names[0] == "Root" and "Hips" in names:
+        dropped_leading_channels = int(channels_per_joint[0])
+        keep = list(range(1, len(names)))
+        index_map = {old: new for new, old in enumerate(keep)}
+        names = [names[i] for i in keep]
+        channels_per_joint = channels_per_joint[keep]
+        offsets = offsets[keep]
+        parents = np.array(
+            [index_map[int(p)] if int(p) in index_map else -1 for p in parents[keep]],
+            dtype=int,
+        )
+
+    # Read the MOTION block.
+    rows = []
+    with open(filename, "r") as f:
+        for line in f:
+            if line.startswith("MOTION"):
+                break
+
+        for line in f:
+            if re.match(r"\s*Frames:", line):
+                break
+
+        for line in f:
+            if re.match(r"\s*Frame Time:", line):
+                break
+
+        for line in f:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            rows.append(np.array(stripped.split(), dtype=float))
+
+    if not rows:
+        raise ValueError(f"No motion frames found in {filename}.")
+
+    if start is not None or end is not None:
+        rows = rows[start:end]
+
+    total_channels = int(channels_per_joint.sum())
+    positions = np.tile(offsets[np.newaxis, :, :], (len(rows), 1, 1))
+    rotations = np.zeros((len(rows), len(names), 3))
+
+    for frame_idx, row in enumerate(rows):
+        if dropped_leading_channels:
+            row = row[dropped_leading_channels:]
+        if row.shape[0] != total_channels:
+            raise ValueError(
+                f"Frame {frame_idx} of {filename} has {row.shape[0]} values, "
+                f"expected {total_channels} from the hierarchy."
+            )
+        cursor = 0
+        for joint_idx in range(len(names)):
+            num_channels = int(channels_per_joint[joint_idx])
+            if num_channels == 6:
+                positions[frame_idx, joint_idx] = row[cursor:cursor + 3]
+                rotations[frame_idx, joint_idx] = row[cursor + 3:cursor + 6]
+            elif num_channels == 3:
+                rotations[frame_idx, joint_idx] = row[cursor:cursor + 3]
+            elif num_channels != 0:
+                raise ValueError(
+                    f"Unsupported channel count {num_channels} for joint "
+                    f"'{names[joint_idx]}' in {filename}."
+                )
+            cursor += num_channels
+
+    #将qingtong数据集转变为lafan格式
+    names, offsets, parents, rotations, positions = qingtong_to_lafan(
+        names, offsets, parents, rotations, positions
+    )
+
+    rotations = utils.euler_to_quat(np.radians(rotations), order=order)
+    rotations = utils.remove_quat_discontinuities(rotations)
+
+    return Anim(rotations, positions, offsets, parents, names)
+
+
+LAFAN_DEFAULT_NAMES = ['Hips', 
+                 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head',
+                 'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',
+                 'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand',
+                 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'LeftToeBase',
+                 'RightUpLeg', 'RightLeg', 'RightFoot', 'RightToeBase',
+                 ]
+
+# qmai(seed)名称 -> lafan名称。注意这里的错位：qmai 的 LeftShoulder 实际是锁骨，
+# 所以映射到 lafan 的 LeftShoulder；LeftElbow 映射到其下游的 LeftForeArm。
+QMAI_TO_LAFAN_MAPPING = {
     'hips': 'Hips',
     'Chest': 'Spine',
     'Chest2': 'Spine1',
@@ -853,45 +1041,87 @@ def qmai_to_lafan(names, offsets, parents, rotations, positions):
     'RightKnee': 'RightLeg',
     'RightAnkle': 'RightFoot',
     'RightToe': 'RightToeBase',
-    }
-    
-    names = [SEED_TO_LAFAN_MAPPING.get(item, item) for item in names]
-    # print(f"映射后的名称表：{names}")
+}
 
-    lafan_default_names = ['Hips', 
-                     'Spine', 'Spine1', 'Spine2', 'Neck', 'Head',
-                     'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',
-                     'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand',
-                     'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'LeftToeBase',
-                     'RightUpLeg', 'RightLeg', 'RightFoot', 'RightToeBase',
-                     ]
-    
+# qingtong(SOMA)名称 -> lafan名称。SOMA 与 lafan 的关节位置本身一致，只是命名不同；
+# 脊柱链 SOMA 多一节（Spine1/Spine2/Chest/Neck1/Neck2 vs Spine/Spine1/Spine2/Neck），
+# 所以逐级上移并把 Neck1/Neck2 折叠成同一个 Neck。
+QINGTONG_TO_LAFAN_MAPPING = {
+    # 脊柱链：SOMA 多一节，逐级上移
+    'Spine1': 'Spine',
+    'Spine2': 'Spine1',
+    'Chest': 'Spine2',
+    'Neck1': 'Neck',
+    'Neck2': 'Neck',
+
+    'LeftShoulder': 'LeftShoulder',
+    'LeftArm': 'LeftArm',
+    'LeftForeArm': 'LeftForeArm',
+    'LeftHand': 'LeftHand',
+    'RightShoulder': 'RightShoulder',
+    'RightArm': 'RightArm',
+    'RightForeArm': 'RightForeArm',
+    'RightHand': 'RightHand',
+
+    'LeftLeg': 'LeftUpLeg',
+    'LeftShin': 'LeftLeg',
+    'LeftFoot': 'LeftFoot',
+    'LeftToeBase': 'LeftToeBase',
+    'RightLeg': 'RightUpLeg',
+    'RightShin': 'RightLeg',
+    'RightFoot': 'RightFoot',
+    'RightToeBase': 'RightToeBase',
+}
+
+
+def qmai_to_lafan(names, offsets, parents, rotations, positions):
+    """将qmai的bvh调整成lafan格式，名称映射即删除多余骨骼（如手指）。"""
+    return to_lafan(
+        names, offsets, parents, rotations, positions, QMAI_TO_LAFAN_MAPPING
+    )
+
+
+def qingtong_to_lafan(names, offsets, parents, rotations, positions):
+    """将qingtong(SOMA)的bvh调整成lafan格式，名称映射即删除多余骨骼。"""
+    return to_lafan(
+        names, offsets, parents, rotations, positions, QINGTONG_TO_LAFAN_MAPPING
+    )
+
+
+def to_lafan(names, offsets, parents, rotations, positions, mapping):
+    """把任意来源的骨架名称映射到lafan默认骨骼名，并裁剪掉多余骨骼。
+
+    :param mapping: 源名称 -> lafan名称的对照表，未命中的名称保持原样
+    """
+    names = [mapping.get(item, item) for item in names]
+
     #通过原始names和lafan的默认names生成保留序列
+    # 同一个 LAFAN 名字只保留第一个源关节，保证输出每个名字恰好一个关节。
     lafan_index = []
+    seen_names = set()
     for i, name in enumerate(names):
-        if name in lafan_default_names:
+        if name in LAFAN_DEFAULT_NAMES and name not in seen_names:
+            seen_names.add(name)
             lafan_index.append(i)
 
-    #去除offsets，rotations，positions的多余项
-    lafan_offsets = offsets[lafan_index]
+    kept = set(lafan_index)
+    output_index = {source_idx: out_idx for out_idx, source_idx in enumerate(lafan_index)}
+
+    lafan_offsets = np.zeros((len(lafan_index), 3))
+    lafan_parents = []
+    for out_idx, source_idx in enumerate(lafan_index):
+        # 向上找到最近的保留祖先，并把途中被跳过关节的 offset 累加进来，
+        # 这样静止姿态下该关节的位置与原始骨架一致。
+        folded_offset = offsets[source_idx].astype(float).copy()
+        ancestor = int(parents[source_idx])
+        while ancestor != -1 and ancestor not in kept:
+            folded_offset = folded_offset + offsets[ancestor]
+            ancestor = int(parents[ancestor])
+        lafan_offsets[out_idx] = folded_offset
+        lafan_parents.append(output_index[ancestor] if ancestor != -1 else -1)
+
+    #去除rotations，positions的多余项
     lafan_rotations = rotations[:, lafan_index]
     lafan_positions = positions[:, lafan_index]
 
-    #先将parents索引翻译为夫节点名称列表，去除对应项后再转回索引
-    parents_names = []
-    for i in parents:
-        if i != -1:
-            parents_names.append(names[i])
-        else:
-            parents_names.append("-1")
-    # print(f"删减前的父节点名称表{parents_names}")
-    lafan_parents_names = [parents_names[i] for i in lafan_index]
-    # print(f"删减后的父节点名称表{lafan_parents_names}")
-    lafan_parents = []
-    for name in lafan_parents_names:
-        if name != "-1":
-            lafan_parents.append(lafan_default_names.index(name))
-        else:
-            lafan_parents.append(-1)
-    
-    return lafan_default_names, lafan_offsets, lafan_parents, lafan_rotations, lafan_positions
+    return LAFAN_DEFAULT_NAMES, lafan_offsets, lafan_parents, lafan_rotations, lafan_positions

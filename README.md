@@ -343,7 +343,7 @@ python scripts/pkl_to_csv.py \
   - `--output`（可选）：
     - 单文件模式：可传目标 `.csv` 文件路径，或输出目录；
     - 批量模式：作为输出目录使用；
-    - 不传时默认输出到输入同级 `csv/` 子目录。
+    - 不传时默认输出到与 `pkl/` 目录平级的 `csv/`（例如 `output/aelos/pkl/foo.pkl` → `output/aelos/csv/foo.csv`）。若输入不在名为 `pkl` 的目录中，则仍写到文件同级 `csv/`。
   - `--max_frames`（可选）：限制导出最大帧数（从第 0 帧开始）。
 
 - 输出格式
@@ -367,20 +367,11 @@ python scripts/pkl_to_csv.py \
 python scripts/pkl_to_csv.py \
 --robot roban_s17 \
 --folder output/roban_s17/pkl \
---output output/roban_s17/pkl/csv \
+--output output/roban_s17/csv \
 --max_frames 2000
 ```
 ## 8、适配目录(详见`general_motion_retargeting/params.py`)
 
-<<<<<<< HEAD
-| Assigned ID | Robot/Data Format | Robot DoF | SMPLX ([AMASS](https://amass.is.tue.mpg.de/), [OMOMO](https://github.com/lijiaman/omomo_release)) | BVH [LAFAN1](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)| FBX ([OptiTrack](https://www.optitrack.com/)) |  BVH (Leju) | PICO ([XRoboToolkit](https://github.com/XR-Robotics/XRoboToolkit-PC-Service)) | More formats coming soon | 
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Roban S14 `roban_s14` | Leg (2\*6) + Waist (1) + Arm (2\*4) = 21 | TBD | TBD | TBD | ✅ | TBD |
-| 2 | Roban S17 `roban_s17` | Leg (2\*6) + Waist (1) + Arm (2\*4) = 21 | TBD | TBD | TBD | ✅ | TBD |
-| 3 | Kuavo S52 `kuavo_s52` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | TBD | TBD |  ✅ | TBD |
-| 4 | Kuavo S54 `kuavo_s54` | Leg (2\*6) + Waist (1) + Arm (2\*7) = 27 | TBD | TBD | TBD |  ✅ | TBD |
-| 5 | Aelos `aelos` | Leg (2\*5) + Waist (0) + Arm (2\*3) = 16 | TBD | TBD | TBD |  ✅ | TBD |
-=======
 ### 8.1 机器人 × 数据格式 支持矩阵
 
 | 机器人 | 标识 | DoF | qpos 维度 | SMPL-X | SMPL | BVH LAFAN1 | BVH Leju |
@@ -406,4 +397,3 @@ python scripts/pkl_to_csv.py \
 | `scripts/vis_robot_motion.py` | 可视化已保存的机器人 PKL |
 | `scripts/pkl_to_csv.py` | PKL → CSV，按机器人 DoF 严格校验 |
 | `scripts/batch_gmr_pkl_to_csv.py` | 批量 PKL → CSV（兼容 beyondmimic 格式） |
->>>>>>> origin/main
